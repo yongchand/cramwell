@@ -13,6 +13,8 @@ RUN npm ci
 # Copy frontend source code
 COPY frontend/ .
 
+RUN echo "SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" && echo "SUPABASE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"
+
 # Build the frontend application
 RUN npm run build
 
