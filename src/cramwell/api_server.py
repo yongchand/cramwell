@@ -9,12 +9,24 @@ import uuid
 from datetime import datetime
 import json
 import aiohttp
+import logging
 from dotenv import load_dotenv
 
 from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
 from .database import supabase
-from llama_index.tools.mcp import BasicMCPClient
+try:
+    from llama_index.tools.mcp import BasicMCPClient
+except ImportError:
+    # Fallback for different versions
+    from llama_index.tools import BasicMCPClient
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
@@ -28,12 +40,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Development
-        "https://your-domain.com",  # Replace with your production domain
-        "https://*.your-domain.com",  # Allow subdomains
+        "https://localhost:3000",  # Development HTTPS
+        os.getenv("FRONTEND_URL", "https://your-domain.com"),  # Production frontend URL
+        os.getenv("FRONTEND_URL_DEV", "http://localhost:3000"),  # Development frontend URL
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # MCP Client for notebook-specific operations
@@ -199,9 +213,7 @@ async def update_notebook(notebook_id: str, request: CreateNotebookRequest):
         "updated_at": now
     }
     res = supabase.table("notebooks").update(data).eq("id", notebook_id).execute()
-    nb = res.data[0] if res.data else None
-    if not nb:
-        raise HTTPException(status_code=404, detail="Notebook not found")
+    nb = res.data[0]
     return NotebookResponse(
         id=nb["id"],
         name=nb["name"],
@@ -213,11 +225,11 @@ async def update_notebook(notebook_id: str, request: CreateNotebookRequest):
 
 @app.delete("/notebooks/{notebook_id}")
 async def delete_notebook(notebook_id: str):
-    """Delete a notebook in Supabase"""
+    """Delete a notebook from Supabase"""
     res = supabase.table("notebooks").delete().eq("id", notebook_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Notebook not found")
-    return {"message": "Notebook deleted"}
+    return {"message": "Notebook deleted successfully"}
 
 # --- Sources, chat, and study features endpoints ---
 # TODO: Migrate these to Supabase as well. For now, remove all in-memory checks and raise NotImplementedError or return empty lists.
@@ -280,7 +292,7 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
             raise HTTPException(status_code=500, detail="Invalid processing result")
             
     except Exception as e:
-        print(f"Upload error: {str(e)}")
+        logger.error(f"Upload error: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
@@ -367,7 +379,7 @@ async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
         )
         
     except Exception as e:
-        print(f"Chat error: {str(e)}")
+        logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
@@ -400,7 +412,7 @@ async def get_chat_history(notebook_id: str, user_id: str):
             ) for msg in messages
         ]
     except Exception as e:
-        print(f"Chat history error: {str(e)}")
+        logger.error(f"Chat history error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
 
 
@@ -425,7 +437,7 @@ async def get_sources(notebook_id: str):
             ) for doc in documents
         ]
     except Exception as e:
-        print(f"Sources error: {str(e)}")
+        logger.error(f"Sources error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch sources: {str(e)}")
 
 # The rest of the endpoints (study features, etc.) should be similarly stubbed or migrated as needed.
@@ -509,7 +521,7 @@ async def get_summary(notebook_id: str):
         )
         
     except Exception as e:
-        print(f"Get summary error: {str(e)}")
+        logger.error(f"Get summary error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
 
 @app.post("/notebooks/{notebook_id}/generate-summary/", response_model=StudyFeatureResponse)
@@ -601,7 +613,7 @@ async def generate_summary(notebook_id: str):
         )
         
     except Exception as e:
-        print(f"Summary generation error: {str(e)}")
+        logger.error(f"Summary generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
 
 @app.post("/notebooks/{notebook_id}/generate-sample-exam/", response_model=StudyFeatureResponse)
@@ -667,7 +679,7 @@ async def generate_sample_exam(notebook_id: str):
         )
         
     except Exception as e:
-        print(f"Exam generation error: {str(e)}")
+        logger.error(f"Exam generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate exam: {str(e)}")
 
 @app.post("/notebooks/{notebook_id}/generate-flashcards/", response_model=StudyFeatureResponse)
@@ -725,7 +737,7 @@ async def generate_flashcards(notebook_id: str):
         )
         
     except Exception as e:
-        print(f"Flashcard generation error: {str(e)}")
+        logger.error(f"Flashcard generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate flashcards: {str(e)}")
 
 if __name__ == "__main__":
