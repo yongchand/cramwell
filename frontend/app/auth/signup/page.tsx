@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+
+export const dynamic = 'force-dynamic';
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -9,11 +11,27 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [supabase, setSupabase] = useState<any>(null);
   const router = useRouter();
-  const supabase = createClient();
+
+  useEffect(() => {
+    // Only create client in browser
+    if (typeof window !== 'undefined') {
+      try {
+        setSupabase(createClient());
+      } catch (err) {
+        console.error('Failed to create Supabase client:', err);
+      }
+    }
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setError("Supabase client not available");
+      return;
+    }
+    
     setLoading(true);
     setError("");
     setSuccess(false);
