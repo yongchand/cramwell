@@ -11,7 +11,7 @@ sleep 10
 
 # Start the API server in the background
 echo "Starting API server..."
-uvicorn src.cramwell.api_server:app --host 0.0.0.0 --port 8001 &
+uvicorn src.cramwell.api_server:app --host 0.0.0.0 --port ${API_PORT:-8001} &
 API_PID=$!
 
 # Wait for API server to be ready

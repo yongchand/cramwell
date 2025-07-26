@@ -17,7 +17,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Python backend stage
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Set working directory
 WORKDIR /app
@@ -64,7 +64,7 @@ RUN chmod +x start.sh
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Expose ports
+# Expose ports (Railway will use $PORT)
 EXPOSE 8000 8001 3000
 
 # Set environment variables
