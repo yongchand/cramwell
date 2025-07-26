@@ -19,8 +19,6 @@ RUN npm ci
 # Copy frontend source code
 COPY frontend/ .
 
-RUN echo "SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" && echo "SUPABASE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"
-
 # Build the frontend application
 RUN npm run build
 
@@ -30,11 +28,12 @@ FROM python:3.13-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and clean up in one layer
 RUN apt-get update && apt-get install -y \
     curl \
     nodejs \
     npm \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -43,8 +42,9 @@ RUN pip install uv
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies
-RUN uv sync --frozen
+# Install Python dependencies and clean up
+RUN uv sync --frozen && \
+    rm -rf /root/.cache/pip /root/.cache/uv
 
 # Copy source code
 COPY src/ ./src/
@@ -62,9 +62,10 @@ COPY --from=frontend-builder /app/frontend/jsconfig.json ./frontend/jsconfig.jso
 COPY --from=frontend-builder /app/frontend/next-env.d.ts ./frontend/next-env.d.ts
 COPY --from=frontend-builder /app/frontend/lib ./frontend/lib
 
-# Install frontend runtime dependencies
+# Install frontend runtime dependencies and clean up
 WORKDIR /app/frontend
-RUN npm ci --only=production
+RUN npm ci --only=production && \
+    npm cache clean --force
 
 # Copy startup script
 WORKDIR /app
