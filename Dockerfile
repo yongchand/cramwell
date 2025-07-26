@@ -12,7 +12,7 @@ RUN npm ci
 
 # Copy frontend source code and environment file
 COPY frontend/ .
-COPY .env ./frontend/.env
+# COPY .env ./frontend/.env
 
 # Build the frontend application
 RUN npm run build
@@ -66,7 +66,7 @@ RUN npm ci --only=production && \
 # Copy startup script and environment file
 WORKDIR /app
 COPY start.sh ./
-COPY .env ./
+# COPY .env ./
 RUN chmod +x start.sh
 
 # Create uploads directory
