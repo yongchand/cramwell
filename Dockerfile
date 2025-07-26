@@ -47,6 +47,7 @@ COPY --from=frontend-builder /app/frontend/next.config.js ./frontend/next.config
 COPY --from=frontend-builder /app/frontend/tailwind.config.js ./frontend/tailwind.config.js
 COPY --from=frontend-builder /app/frontend/postcss.config.js ./frontend/postcss.config.js
 COPY --from=frontend-builder /app/frontend/tsconfig.json ./frontend/tsconfig.json
+COPY --from=frontend-builder /app/frontend/next-env.d.ts ./frontend/next-env.d.ts
 
 # Install frontend runtime dependencies
 WORKDIR /app/frontend
