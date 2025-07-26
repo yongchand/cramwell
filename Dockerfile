@@ -7,8 +7,8 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install frontend dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy frontend source code
 COPY frontend/ .
@@ -43,6 +43,10 @@ COPY src/ ./src/
 COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
 COPY --from=frontend-builder /app/frontend/public ./frontend/public
 COPY --from=frontend-builder /app/frontend/package.json ./frontend/package.json
+COPY --from=frontend-builder /app/frontend/next.config.js ./frontend/next.config.js
+COPY --from=frontend-builder /app/frontend/tailwind.config.js ./frontend/tailwind.config.js
+COPY --from=frontend-builder /app/frontend/postcss.config.js ./frontend/postcss.config.js
+COPY --from=frontend-builder /app/frontend/tsconfig.json ./frontend/tsconfig.json
 
 # Install frontend runtime dependencies
 WORKDIR /app/frontend
