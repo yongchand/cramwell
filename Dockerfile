@@ -25,6 +25,8 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -43,6 +45,7 @@ COPY src/ ./src/
 COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
 COPY --from=frontend-builder /app/frontend/public ./frontend/public
 COPY --from=frontend-builder /app/frontend/package.json ./frontend/package.json
+COPY --from=frontend-builder /app/frontend/package-lock.json ./frontend/package-lock.json
 COPY --from=frontend-builder /app/frontend/next.config.js ./frontend/next.config.js
 COPY --from=frontend-builder /app/frontend/tailwind.config.js ./frontend/tailwind.config.js
 COPY --from=frontend-builder /app/frontend/postcss.config.js ./frontend/postcss.config.js
