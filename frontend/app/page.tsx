@@ -6,7 +6,7 @@ import LoginForm from "@/components/LoginForm";
 const backgroundImage = "/uchicago-bg.jpg";
 
 export default async function LoginHeroPage() {
-  const supabase = createClient(cookies());
+  const supabase = await createClient(cookies());
   const { data: { user } } = await supabase.auth.getUser();
 
   if (user) {

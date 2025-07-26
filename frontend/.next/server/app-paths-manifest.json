@@ -1,6 +1,10 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/health/route": "app/api/health/route.js",
+  "/auth/login/page": "app/auth/login/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/page": "app/page.js",
-  "/notebook/[id]/page": "app/notebook/[id]/page.js"
+  "/notebook/[id]/page": "app/notebook/[id]/page.js",
+  "/auth/signup/page": "app/auth/signup/page.js",
+  "/auth/reset/page": "app/auth/reset/page.js",
+  "/page": "app/page.js"
 }
