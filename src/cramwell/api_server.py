@@ -26,7 +26,11 @@ app = FastAPI(title="Cramwell API", version="1.0.0")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:3000",  # Development
+        "https://your-domain.com",  # Replace with your production domain
+        "https://*.your-domain.com",  # Allow subdomains
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
