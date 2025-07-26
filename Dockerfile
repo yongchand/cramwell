@@ -38,7 +38,6 @@ RUN uv sync --frozen
 
 # Copy source code
 COPY src/ ./src/
-COPY prompts/ ./prompts/
 
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
