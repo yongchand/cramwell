@@ -1,12 +1,6 @@
 # Multi-stage build for both frontend and backend
 FROM node:18-alpine AS frontend-builder
 
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
-
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
-
 # Set working directory for frontend
 WORKDIR /app/frontend
 
@@ -16,13 +10,14 @@ COPY frontend/package*.json ./
 # Install ALL dependencies (including dev dependencies for build)
 RUN npm ci
 
-# Copy frontend source code
+# Copy frontend source code and environment file
 COPY frontend/ .
+COPY .env ./frontend/.env
 
 # Build the frontend application
 RUN npm run build
 
-# Python backend stage
+# Python backend stage - use slim for better compatibility
 FROM python:3.13-slim
 
 # Set working directory
@@ -44,6 +39,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install Python dependencies and clean up
 RUN uv sync --frozen && \
+    uv pip install uvicorn && \
     rm -rf /root/.cache/pip /root/.cache/uv
 
 # Copy source code
@@ -67,9 +63,10 @@ WORKDIR /app/frontend
 RUN npm ci --only=production && \
     npm cache clean --force
 
-# Copy startup script
+# Copy startup script and environment file
 WORKDIR /app
 COPY start.sh ./
+COPY .env ./
 RUN chmod +x start.sh
 
 # Create uploads directory
