@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Unified application (frontend + backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cramwell-app
+    ports:
+      - "${API_PORT:-8001}:8001"
+      - "${MCP_PORT:-8000}:8000"
+      - "3000:3000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - MCP_PORT=8000
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-streamable-http}
+      - MCP_URL=http://localhost:8000/mcp
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - NODE_ENV=production
+    volumes:
+      - ./src:/app/src
+      - ./prompts:/app/prompts
+      - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cramwell-network
+
+networks:
+  cramwell-network:
+    driver: bridge
+
+volumes:
+  uploads:
+    driver: local 
