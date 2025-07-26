@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -10,27 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [supabase, setSupabase] = useState<any>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    // Only create client in browser
-    if (typeof window !== 'undefined') {
-      try {
-        setSupabase(createClient());
-      } catch (err) {
-        console.error('Failed to create Supabase client:', err);
-      }
-    }
-  }, []);
+  const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
-      setError("Supabase client not available");
-      return;
-    }
-    
     setLoading(true);
     setError("");
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
