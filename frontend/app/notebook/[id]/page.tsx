@@ -147,7 +147,7 @@ export default function NotebookPage() {
 
   const loadNotebook = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/notebooks/${notebookId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}`)
       if (!response.ok) {
         throw new Error('Notebook not found')
       }
@@ -231,7 +231,7 @@ export default function NotebookPage() {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/notebooks/${notebookId}/summary`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/summary`)
       if (response.ok) {
         const data = await response.json()
         if (data) {
@@ -356,7 +356,7 @@ export default function NotebookPage() {
       setMessages(prev => [...prev, userMessage])
 
       // Send to API for processing
-      const response = await fetch(`http://localhost:8001/notebooks/${notebookId}/chat/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/chat/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -604,7 +604,7 @@ export default function NotebookPage() {
             console.log(`Processing file: ${fileName} for notebook: ${notebookId}`);
             
             // Call the backend API to process the file and add to Pinecone
-            const response = await fetch(`http://localhost:8001/notebooks/${notebookId}/upload/?document_type=${kind}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/upload/?document_type=${kind}`, {
               method: 'POST',
               body: formData,
             });
@@ -919,7 +919,7 @@ export default function NotebookPage() {
         'summary': 'summary'
       }
       const endpointName = endpointMap[featureType]
-      const url = `http://localhost:8001/notebooks/${notebookId}/generate-${endpointName}/`
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/generate-${endpointName}/`
       console.log(`Making request to: ${url}`)
       console.log(`Request method: POST`)
       console.log(`Request headers:`, { 'Content-Type': 'application/json' })

@@ -43,6 +43,7 @@ app.add_middleware(
         "https://localhost:3000",  # Development HTTPS
         os.getenv("FRONTEND_URL", "https://your-domain.com"),  # Production frontend URL
         os.getenv("FRONTEND_URL_DEV", "http://localhost:3000"),  # Development frontend URL
+        "*",  # Allow all origins in development (remove in production)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],

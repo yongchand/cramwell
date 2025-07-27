@@ -63,11 +63,11 @@ WORKDIR /app/frontend
 RUN npm ci --only=production && \
     npm cache clean --force
 
-# Copy startup script and environment file
+# Copy startup scripts
 WORKDIR /app
 COPY start.sh ./
-# COPY .env ./
-RUN chmod +x start.sh
+COPY start-render.sh ./
+RUN chmod +x start.sh start-render.sh
 
 # Create uploads directory
 RUN mkdir -p uploads
@@ -84,5 +84,5 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Default command
-CMD ["./start.sh"]
+# Default command (use start-render.sh for Render deployment)
+CMD ["./start-render.sh"]

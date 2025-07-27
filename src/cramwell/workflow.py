@@ -8,7 +8,10 @@ from workflows.resource import Resource
 from llama_index.tools.mcp import BasicMCPClient
 from typing import Annotated, List, Union
 
-MCP_CLIENT = BasicMCPClient(command_or_url="http://localhost:8000/mcp", timeout=120)
+import os
+
+MCP_URL = os.getenv("MCP_URL", "http://localhost:8000/mcp")
+MCP_CLIENT = BasicMCPClient(command_or_url=MCP_URL, timeout=120)
 
 
 class FileInputEvent(StartEvent):
