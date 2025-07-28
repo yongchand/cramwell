@@ -23,8 +23,6 @@ RUN uv sync --frozen && \
 
 # Copy source code
 COPY src/ ./src/
-COPY prompts/ ./prompts/
-COPY lib/ ./lib/
 COPY tools/ ./tools/
 COPY tests/ ./tests/
 
