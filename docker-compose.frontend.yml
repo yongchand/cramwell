@@ -12,7 +12,7 @@ services:
     environment:
       - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${SUPABASE_ANON_KEY}
-      - NEXT_PUBLIC_API_URL=${API_URL:-http://localhost:8001}
+      - NEXT_PUBLIC_API_URL=${API_URL:-https://cramwell-backend.onrender.com}
     volumes:
       - ./frontend:/app
       - /app/node_modules

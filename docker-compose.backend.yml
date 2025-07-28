@@ -15,6 +15,8 @@ services:
       - API_PORT=8001
       - MCP_PORT=8000
       - MCP_TRANSPORT=${MCP_TRANSPORT:-streamable-http}
+      - FRONTEND_URL=https://cramwell.vercel.app
+      - FRONTEND_URL_DEV=http://localhost:3000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
       - SUPABASE_URL=${SUPABASE_URL}

@@ -53,10 +53,10 @@ Set the following environment variables in Render:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key
-NEXT_PUBLIC_API_URL=https://your-backend-service.onrender.com
+NEXT_PUBLIC_API_URL=https://cramwell-backend.onrender.com
 ```
 
-**Important**: Replace `your-backend-service.onrender.com` with the actual URL of your backend service.
+**Important**: The API URL is set to the production backend service.
 
 ## Alternative Frontend Deployment (Web Service)
 
@@ -82,12 +82,15 @@ Same as above for Static Site deployment.
 
 Both services include health check endpoints:
 
-- **Backend**: `https://your-backend-service.onrender.com/health`
-- **Frontend**: `https://your-frontend-service.onrender.com/health`
+- **Backend**: `https://cramwell-backend.onrender.com/health`
+- **Frontend**: `https://cramwell.vercel.app/health`
 
 ## CORS Configuration
 
-The backend API server should be configured to accept requests from your frontend domain. The API server should include the frontend URL in its CORS allowed origins.
+The backend API server is configured to accept requests from:
+- `https://cramwell.vercel.app` (production frontend)
+- `http://localhost:3000` (development frontend)
+- `https://cramwell-backend.onrender.com` (production backend)
 
 ## Troubleshooting
 

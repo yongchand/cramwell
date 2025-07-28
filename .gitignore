@@ -35,6 +35,7 @@ lerna-debug.log*
 out/
 build/
 .vercel
+*/.next/
 
 # Environment files
 .env

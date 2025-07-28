@@ -87,6 +87,10 @@ The backend exposes the following main endpoints:
 - `POST /search/text` - Text search
 - `POST /search/vector` - Vector search
 
+**Production URLs:**
+- **Backend API**: `https://cramwell-backend.onrender.com`
+- **Frontend**: `https://cramwell.vercel.app`
+
 ## MCP Server
 
 The MCP (Model Context Protocol) server runs internally on port 8000 and is used by the API server for AI interactions. It's not exposed externally for security reasons.
