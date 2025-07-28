@@ -30,7 +30,6 @@ COPY tests/ ./tests/
 RUN mkdir -p uploads
 
 # Copy startup scripts
-COPY start.sh ./
 COPY start-render.sh ./
 RUN chmod +x start.sh start-render.sh
 
