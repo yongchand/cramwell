@@ -31,7 +31,7 @@ RUN mkdir -p uploads
 
 # Copy startup scripts
 COPY start-render.sh ./
-RUN chmod +x start.sh start-render.sh
+RUN chmod +x start-render.sh
 
 # Expose ports (API server on 8001, MCP server on 8000)
 EXPOSE 8000 8001
