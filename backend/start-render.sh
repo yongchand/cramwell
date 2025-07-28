@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Get the port from Render's PORT environment variable, default to 3000
-PORT=${PORT:-3000}
-
 # Start the MCP server in the background
 echo "Starting MCP server..."
 uv run python -m src.cramwell.server &
@@ -21,11 +18,5 @@ API_PID=$!
 echo "Waiting for API server to be ready..."
 sleep 5
 
-# Start the frontend on the Render-provided port
-echo "Starting frontend on port $PORT..."
-cd /app/frontend
-PORT=$PORT npm start &
-FRONTEND_PID=$!
-
 # Wait for all processes
-wait $MCP_PID $API_PID $FRONTEND_PID 
+wait $MCP_PID $API_PID 

@@ -18,11 +18,5 @@ API_PID=$!
 echo "Waiting for API server to be ready..."
 sleep 5
 
-# Start the frontend
-echo "Starting frontend..."
-cd /app/frontend
-npm start &
-FRONTEND_PID=$!
-
 # Wait for all processes
-wait $MCP_PID $API_PID $FRONTEND_PID 
+wait $MCP_PID $API_PID 

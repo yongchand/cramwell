@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Frontend Static Service (for development only)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cramwell-frontend-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=${API_URL:-http://localhost:8001}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cramwell-network
+
+networks:
+  cramwell-network:
+    driver: bridge 
