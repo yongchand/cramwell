@@ -261,7 +261,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Bar */}
-      <header className="w-full flex items-center justify-between px-8 py-4 border-b border-muted bg-uchicago-crimson">
+      <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted bg-uchicago-crimson">
         <div className="text-2xl font-extrabold text-white tracking-tight">Cramwell</div>
         <div className="flex gap-3 items-center">
           <Button

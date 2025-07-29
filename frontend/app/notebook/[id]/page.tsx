@@ -1419,38 +1419,38 @@ export default function NotebookPage() {
         <section className="flex flex-col h-full min-h-0 bg-muted/50 p-6 border-l border-muted">
             {/* Tabs and study tools content (Sample Exam, Flash Cards, Summary) */}
         <div className="mb-4">
-          <div className="flex w-full gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
             <Button
               variant={activeTab === 'summary' ? 'default' : 'outline'}
-              size="lg"
+              size="sm"
               onClick={() => setActiveTab('summary')}
-              className={`flex-1 text-lg py-6 ${activeTab === 'summary' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
+              className={`text-sm py-3 ${activeTab === 'summary' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
-              <FileText className="h-6 w-6 mr-2" /> Summary
+              <FileText className="h-4 w-4 mr-1" /> Summary
             </Button>
             <Button
               variant={activeTab === 'exam' ? 'default' : 'outline'}
-              size="lg"
+              size="sm"
               onClick={() => setActiveTab('exam')}
-              className={`flex-1 text-lg py-6 ${activeTab === 'exam' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
+              className={`text-sm py-3 ${activeTab === 'exam' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
-              <HelpCircle className="h-6 w-6 mr-2" /> Sample Exam
+              <HelpCircle className="h-4 w-4 mr-1" /> Exam
             </Button>
             <Button
               variant={activeTab === 'flashcards' ? 'default' : 'outline'}
-              size="lg"
+              size="sm"
               onClick={() => setActiveTab('flashcards')}
-              className={`flex-1 text-lg py-6 ${activeTab === 'flashcards' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
+              className={`text-sm py-3 ${activeTab === 'flashcards' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
-              <FileTextIcon className="h-6 w-6 mr-2" /> Flash Cards
+              <FileTextIcon className="h-4 w-4 mr-1" /> Cards
             </Button>
             <Button
               variant={activeTab === 'documents' ? 'default' : 'outline'}
-              size="lg"
+              size="sm"
               onClick={() => setActiveTab('documents')}
-              className={`flex-1 text-lg py-6 ${activeTab === 'documents' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
+              className={`text-sm py-3 ${activeTab === 'documents' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
-              <BookOpen className="h-6 w-6 mr-2" /> Documents
+              <BookOpen className="h-4 w-4 mr-1" /> Docs
             </Button>
           </div>
         </div>
