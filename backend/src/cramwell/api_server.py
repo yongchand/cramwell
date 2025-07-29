@@ -63,7 +63,7 @@ class MCPClientPool:
     async def initialize(self):
         if not self._initialized:
             for _ in range(self.max_connections):
-                client = BasicMCPClient(command_or_url=MCP_URL, timeout=30)
+                client = BasicMCPClient(command_or_url=MCP_URL, timeout=240)
                 await self._clients.put(client)
             self._initialized = True
     
