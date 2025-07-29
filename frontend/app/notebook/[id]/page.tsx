@@ -12,6 +12,7 @@ import { UploadDialog } from '@/components/upload-dialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { createClient } from '@/utils/supabase/client'
 import ReactMarkdown from 'react-markdown'
+import { CourseStatsCharts } from '@/components/CourseStatsPieChart'
 
 interface Notebook {
   id: string
@@ -94,6 +95,12 @@ export default function NotebookPage() {
     exam?: StudyFeature
     flashcards?: StudyFeature
     summary?: StudyFeature
+  }>({})
+  const [summaryStats, setSummaryStats] = useState<{
+    average_gpa?: number
+    average_hours?: number
+    prof_ratings?: number
+    course_ratings?: number
   }>({})
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -239,6 +246,26 @@ export default function NotebookPage() {
             ...prev,
             summary: data
           }))
+          
+          // Extract statistics from the summary content
+          const content = data.content || ''
+          const statsMatch = content.match(/\*\*Average GPA\*\*: ([\d.]+)/)
+          const hoursMatch = content.match(/\*\*Average Hours\*\*: ([\d.]+)/)
+          const profMatch = content.match(/\*\*Professor Rating\*\*: ([\d.]+)\/5\.0/)
+          const courseMatch = content.match(/\*\*Course Rating\*\*: ([\d.]+)\/5\.0/)
+          
+          const stats = {
+            average_gpa: statsMatch ? parseFloat(statsMatch[1]) : undefined,
+            average_hours: hoursMatch ? parseFloat(hoursMatch[1]) : undefined,
+            prof_ratings: profMatch ? parseFloat(profMatch[1]) : undefined,
+            course_ratings: courseMatch ? parseFloat(courseMatch[1]) : undefined
+          }
+          
+          console.log('Extracted stats:', stats)
+          console.log('Content:', content)
+          console.log('Matches:', { statsMatch, hoursMatch, profMatch, courseMatch })
+          
+          setSummaryStats(stats)
         }
       } else if (response.status === 404) {
         // No summary exists yet, that's okay
@@ -1327,6 +1354,39 @@ export default function NotebookPage() {
                     </Card>
                   </div>
                 )}
+                
+                {/* Recommended Prompts */}
+                {messages.length === 0 && !isSending && (
+                  <div className="flex flex-col items-center justify-center h-full space-y-4">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold mb-2">How can I help you with this course?</h3>
+                      <p className="text-sm text-muted-foreground mb-6">Try asking one of these questions:</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 w-full max-w-md">
+                      <button
+                        onClick={() => setNewMessage("How should I prepare for the exam for this course?")}
+                        className="text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="font-medium text-sm">How should I prepare for the exam for this course?</div>
+                        <div className="text-xs text-muted-foreground mt-1">Get exam preparation tips and strategies</div>
+                      </button>
+                      <button
+                        onClick={() => setNewMessage("What is the most important concept of this course?")}
+                        className="text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="font-medium text-sm">What is the most important concept of this course?</div>
+                        <div className="text-xs text-muted-foreground mt-1">Understand the key learning objectives</div>
+                      </button>
+                      <button
+                        onClick={() => setNewMessage("How difficult is this course?")}
+                        className="text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="font-medium text-sm">How difficult is this course?</div>
+                        <div className="text-xs text-muted-foreground mt-1">Learn about the course difficulty and workload</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <div ref={messagesEndRef} />
@@ -1335,7 +1395,7 @@ export default function NotebookPage() {
           {/* Input Bar */}
           <div className="flex gap-2 mt-2 bg-muted/70 rounded-xl p-2 shadow-inner sticky bottom-0 z-10">
             <Input
-              placeholder="Ask a question about your documents..."
+              placeholder="Ask any question about this course..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -1407,7 +1467,7 @@ export default function NotebookPage() {
                 <div className="text-center py-8">
                   <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground mb-4">
-                    Generate sample exam questions from your documents
+                    Generate sample exam questions from past classes
                   </p>
                   <Button
                     onClick={() => generateStudyFeature('exam')}
@@ -1766,10 +1826,18 @@ export default function NotebookPage() {
                 </Button>
               </div>
               
+              {/* Course Statistics Charts */}
+              {(summaryStats.average_gpa || summaryStats.average_hours || summaryStats.prof_ratings || summaryStats.course_ratings) && (
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <h4 className="text-lg font-semibold mb-4">Course Statistics</h4>
+                  <CourseStatsCharts stats={summaryStats} />
+                </div>
+              )}
+              
               <div className="prose prose-sm max-w-none bg-muted p-6 rounded-lg">
                 {studyFeatures.summary?.content ? (
                   <ReactMarkdown>
-                    {studyFeatures.summary.content}
+                    {studyFeatures.summary.content.replace(/## Course Statistics[\s\S]*?(?=##|$)/g, '')}
                   </ReactMarkdown>
                 ) : (
                   <div className="text-center py-8">
