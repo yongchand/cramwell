@@ -109,6 +109,10 @@ class PineconeService:
             import traceback
             traceback.print_exc()
             return False
+        finally:
+            # Force garbage collection after embedding generation
+            import gc
+            gc.collect()
     
     async def query_notebook(
         self, 

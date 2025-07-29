@@ -11,6 +11,7 @@ import json
 import aiohttp
 import logging
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
@@ -52,12 +53,65 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# MCP Client for notebook-specific operations
-MCP_CLIENT = BasicMCPClient(command_or_url=MCP_URL, timeout=120)
+# MCP Client Pool for notebook-specific operations
+class MCPClientPool:
+    def __init__(self, max_connections=5):
+        self.max_connections = max_connections
+        self._clients = asyncio.Queue(maxsize=max_connections)
+        self._initialized = False
+    
+    async def initialize(self):
+        if not self._initialized:
+            for _ in range(self.max_connections):
+                client = BasicMCPClient(command_or_url=MCP_URL, timeout=30)
+                await self._clients.put(client)
+            self._initialized = True
+    
+    @asynccontextmanager
+    async def get_client(self):
+        await self.initialize()
+        client = await self._clients.get()
+        try:
+            yield client
+        finally:
+            await self._clients.put(client)
+
+# Replace global MCP_CLIENT with pool
+mcp_pool = MCPClientPool()
 
 def notebook_exists(notebook_id: str) -> bool:
     res = supabase.table("notebooks").select("id").eq("id", notebook_id).single().execute()
     return bool(res.data)
+
+# Memory cleanup task
+async def memory_cleanup_task():
+    """Periodic memory cleanup task."""
+    while True:
+        try:
+            # Force garbage collection
+            import gc
+            gc.collect()
+            
+            # Log memory usage
+            import psutil
+            process = psutil.Process()
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory usage: {memory_mb:.1f}MB")
+            
+            # If memory usage is high, force more aggressive cleanup
+            if memory_mb > 1000:  # 1GB threshold
+                logger.warning(f"High memory usage detected: {memory_mb:.1f}MB")
+                gc.collect()
+                
+        except Exception as e:
+            logger.error(f"Error in memory cleanup task: {e}")
+        
+        await asyncio.sleep(300)  # Run every 5 minutes
+
+# Start memory cleanup task when app starts
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(memory_cleanup_task())
 
 # Health check endpoint
 @app.get("/health")
@@ -248,26 +302,25 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
     if file_ext not in allowed_types:
         raise HTTPException(status_code=400, detail=f"File type {file_ext} not supported. Allowed types: {allowed_types}")
     
-    # Check file size (25MB limit)
-    file_size = 0
-    content = b""
-    while chunk := await file.read(8192):
-        content += chunk
-        file_size += len(chunk)
-        if file_size > 25 * 1024 * 1024:  # 25MB
-            raise HTTPException(status_code=400, detail="File too large. Maximum size is 25MB.")
-    
-    # Create temporary file
+    # Create temporary file and stream content
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-        temp_file.write(content)
+        file_size = 0
+        while chunk := await file.read(8192):
+            temp_file.write(chunk)
+            file_size += len(chunk)
+            if file_size > 25 * 1024 * 1024:  # 25MB
+                temp_file.close()
+                os.unlink(temp_file.name)
+                raise HTTPException(status_code=400, detail="File too large. Maximum size is 25MB.")
         temp_file_path = temp_file.name
     
     try:
         # Process file using MCP client for notebook-specific processing
-        result = await MCP_CLIENT.call_tool(
-            tool_name="process_file_for_notebook_tool",
-            arguments={"filename": temp_file_path, "notebook_id": notebook_id, "document_type": document_type}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="process_file_for_notebook_tool",
+                arguments={"filename": temp_file_path, "notebook_id": notebook_id, "document_type": document_type}
+            )
         
         if result.content[0].text == "Sorry, your file could not be processed.":
             raise HTTPException(status_code=400, detail="File could not be processed")
@@ -302,6 +355,9 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
         # Clean up temporary file
         if os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
+        # Force garbage collection
+        import gc
+        gc.collect()
 
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
@@ -312,10 +368,11 @@ async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
     
     try:
         # Query using notebook-specific context
-        result = await MCP_CLIENT.call_tool(
-            tool_name="query_index_for_notebook_tool",
-            arguments={"question": request.message, "notebook_id": notebook_id}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="query_index_for_notebook_tool",
+                arguments={"question": request.message, "notebook_id": notebook_id}
+            )
         
         # Handle the MCP response properly
         if not result.content or len(result.content) == 0:
@@ -481,10 +538,11 @@ async def get_summary(notebook_id: str):
         """
         
         # Use MCP client to generate brief summary
-        result = await MCP_CLIENT.call_tool(
-            tool_name="query_index_for_notebook_tool",
-            arguments={"question": summary_prompt, "notebook_id": notebook_id}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="query_index_for_notebook_tool",
+                arguments={"question": summary_prompt, "notebook_id": notebook_id}
+            )
         
         if not result.content or len(result.content) == 0:
             syllabus_summary = "No syllabus content available for summarization."
@@ -552,10 +610,11 @@ async def generate_summary(notebook_id: str):
         """
         
         # Use MCP client to generate summary
-        result = await MCP_CLIENT.call_tool(
-            tool_name="query_index_for_notebook_tool",
-            arguments={"question": summary_prompt, "notebook_id": notebook_id}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="query_index_for_notebook_tool",
+                arguments={"question": summary_prompt, "notebook_id": notebook_id}
+            )
         
         if not result.content or len(result.content) == 0:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
@@ -664,10 +723,11 @@ async def generate_sample_exam(notebook_id: str):
         """
         
         # Use MCP client to generate exam questions
-        result = await MCP_CLIENT.call_tool(
-            tool_name="query_index_for_notebook_tool",
-            arguments={"question": exam_prompt, "notebook_id": notebook_id}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="query_index_for_notebook_tool",
+                arguments={"question": exam_prompt, "notebook_id": notebook_id}
+            )
         
         if not result.content or len(result.content) == 0:
             raise HTTPException(status_code=500, detail="Failed to generate exam questions")
@@ -722,10 +782,11 @@ async def generate_flashcards(notebook_id: str):
         """
         
         # Use MCP client to generate flashcards
-        result = await MCP_CLIENT.call_tool(
-            tool_name="query_index_for_notebook_tool",
-            arguments={"question": flashcard_prompt, "notebook_id": notebook_id}
-        )
+        async with mcp_pool.get_client() as client:
+            result = await client.call_tool(
+                tool_name="query_index_for_notebook_tool",
+                arguments={"question": flashcard_prompt, "notebook_id": notebook_id}
+            )
         
         if not result.content or len(result.content) == 0:
             raise HTTPException(status_code=500, detail="Failed to generate flashcards")

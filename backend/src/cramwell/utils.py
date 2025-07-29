@@ -151,6 +151,7 @@ async def parse_file(
     images: Optional[List[str]] = None
     text: Optional[str] = None
     tables: Optional[List[pd.DataFrame]] = None
+    converter = None
     
     try:
         # Use Docling to parse the document
@@ -181,6 +182,13 @@ async def parse_file(
         import traceback
         traceback.print_exc()
         return None, None, None
+    finally:
+        # Explicitly clean up converter
+        if converter:
+            del converter
+        # Force garbage collection
+        import gc
+        gc.collect()
 
 
 async def process_file(
@@ -322,6 +330,10 @@ async def process_file_for_notebook(
         import traceback
         traceback.print_exc()
         return None, None
+    finally:
+        # Force garbage collection after processing
+        import gc
+        gc.collect()
 
 
 
