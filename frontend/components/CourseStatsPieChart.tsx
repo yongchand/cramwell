@@ -16,8 +16,6 @@ interface CourseStatsChartsProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export function CourseStatsCharts({ stats, className = '' }: CourseStatsChartsProps) {
-  console.log('CourseStatsCharts received stats:', stats)
-  
   // Create bar chart data for all statistics
   const allStatsData = [
     {

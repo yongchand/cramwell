@@ -261,10 +261,6 @@ export default function NotebookPage() {
             course_ratings: courseMatch ? parseFloat(courseMatch[1]) : undefined
           }
           
-          console.log('Extracted stats:', stats)
-          console.log('Content:', content)
-          console.log('Matches:', { statsMatch, hoursMatch, profMatch, courseMatch })
-          
           setSummaryStats(stats)
         }
       } else if (response.status === 404) {
