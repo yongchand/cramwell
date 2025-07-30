@@ -1,4 +1,4 @@
-# Backend Dockerfile for API and MCP servers
+# Backend Dockerfile for API server
 FROM python:3.13-slim
 
 # Set working directory
@@ -33,8 +33,8 @@ RUN mkdir -p uploads
 COPY start-render.sh ./
 RUN chmod +x start-render.sh
 
-# Expose ports (API server on 8001, MCP server on 8000)
-EXPOSE 8000 8001
+# Expose port (API server on 8001)
+EXPOSE 8001
 
 # Set environment variables
 ENV PYTHONPATH=/app

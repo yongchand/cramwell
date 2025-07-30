@@ -11,16 +11,10 @@ import json
 import aiohttp
 import logging
 from dotenv import load_dotenv
-from contextlib import asynccontextmanager
 
 from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
 from .database import supabase
-try:
-    from llama_index.tools.mcp import BasicMCPClient
-except ImportError:
-    # Fallback for different versions
-    from llama_index.tools import BasicMCPClient
 
 # Configure logging
 logging.basicConfig(
@@ -32,7 +26,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8001"))
-MCP_URL = os.getenv("MCP_URL", "http://localhost:8000/mcp")
 
 app = FastAPI(title="Cramwell API", version="1.0.0")
 
@@ -52,32 +45,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
-
-# MCP Client Pool for notebook-specific operations
-class MCPClientPool:
-    def __init__(self, max_connections=5):
-        self.max_connections = max_connections
-        self._clients = asyncio.Queue(maxsize=max_connections)
-        self._initialized = False
-    
-    async def initialize(self):
-        if not self._initialized:
-            for _ in range(self.max_connections):
-                client = BasicMCPClient(command_or_url=MCP_URL, timeout=240)
-                await self._clients.put(client)
-            self._initialized = True
-    
-    @asynccontextmanager
-    async def get_client(self):
-        await self.initialize()
-        client = await self._clients.get()
-        try:
-            yield client
-        finally:
-            await self._clients.put(client)
-
-# Replace global MCP_CLIENT with pool
-mcp_pool = MCPClientPool()
 
 def notebook_exists(notebook_id: str) -> bool:
     res = supabase.table("notebooks").select("id").eq("id", notebook_id).single().execute()
@@ -123,19 +90,6 @@ async def health_check():
         "version": "1.0.0",
         "services": {}
     }
-    
-    # Check MCP server
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{MCP_URL.replace('/mcp', '')}/health", timeout=5) as response:
-                if response.status == 200:
-                    health_status["services"]["mcp_server"] = "healthy"
-                else:
-                    health_status["services"]["mcp_server"] = "unhealthy"
-                    health_status["status"] = "degraded"
-    except Exception as e:
-        health_status["services"]["mcp_server"] = f"error: {str(e)}"
-        health_status["status"] = "degraded"
     
     # Check database connection
     try:
@@ -302,10 +256,10 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
     if file_ext not in allowed_types:
         raise HTTPException(status_code=400, detail=f"File type {file_ext} not supported. Allowed types: {allowed_types}")
     
-    # Create temporary file and stream content
+    # Create temporary file and stream content with smaller chunks
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
         file_size = 0
-        while chunk := await file.read(8192):
+        while chunk := await file.read(4096):  # Reduced from 8192 to 4096
             temp_file.write(chunk)
             file_size += len(chunk)
             if file_size > 25 * 1024 * 1024:  # 25MB
@@ -315,36 +269,30 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
         temp_file_path = temp_file.name
     
     try:
-        # Process file using MCP client for notebook-specific processing
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="process_file_for_notebook_tool",
-                arguments={"filename": temp_file_path, "notebook_id": notebook_id, "document_type": document_type}
-            )
+        # Process file directly
+        result = await process_file_for_notebook(temp_file_path, notebook_id, document_type)
         
-        if result.content[0].text == "Sorry, your file could not be processed.":
+        if result[0] is None:
             raise HTTPException(status_code=400, detail="File could not be processed")
         
         # Parse the result
-        split_result = result.content[0].text.split("\n%separator%\n")
+        notebook_model, text_content = result
         
-        if len(split_result) >= 2:
-            json_data = split_result[0]
-            text_content = split_result[1]
-            
-            # Don't create a new document record since frontend already created one
-            # Just return success response
-            now = datetime.now().isoformat()
-            
-            return SourceResponse(
-                id=str(uuid.uuid4()),  # Generate a temporary ID
-                title=file.filename,
-                full_text=f"Document: {file.filename} (processed)",
-                created=now,
-                updated=now
-            )
-        else:
-            raise HTTPException(status_code=500, detail="Invalid processing result")
+        # Clean up large variables immediately
+        del text_content
+        del result
+        
+        # Don't create a new document record since frontend already created one
+        # Just return success response
+        now = datetime.now().isoformat()
+        
+        return SourceResponse(
+            id=str(uuid.uuid4()),  # Generate a temporary ID
+            title=file.filename,
+            full_text=f"Document: {file.filename} (processed)",
+            created=now,
+            updated=now
+        )
             
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
@@ -367,20 +315,11 @@ async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
-        # Query using notebook-specific context
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="query_index_for_notebook_tool",
-                arguments={"question": request.message, "notebook_id": notebook_id}
-            )
+        # Query using notebook-specific context directly
+        response_text = await query_index_for_notebook(request.message, notebook_id)
         
-        # Handle the MCP response properly
-        if not result.content or len(result.content) == 0:
+        if not response_text:
             response_text = "Sorry, I was unable to find an answer to your question."
-        else:
-            response_text = result.content[0].text
-            if not response_text or response_text.strip() == "":
-                response_text = "Sorry, I was unable to find an answer to your question."
         
         # Get or create a chat session for this notebook
         now = datetime.now().isoformat()
@@ -537,89 +476,11 @@ async def get_summary(notebook_id: str):
         Focus on the main topics and key concepts covered in the course materials.
         """
         
-        # Use MCP client to generate brief summary
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="query_index_for_notebook_tool",
-                arguments={"question": summary_prompt, "notebook_id": notebook_id}
-            )
+        # Use direct function to generate summary
+        summary_content = await query_index_for_notebook(summary_prompt, notebook_id)
         
-        if not result.content or len(result.content) == 0:
-            syllabus_summary = "No syllabus content available for summarization."
-        else:
-            syllabus_summary = result.content[0].text
-        
-        # Combine syllabus summary with summary table data
-        if existing_summary:
-            summary_content = f"""
-# Course Summary
-
-## Syllabus Overview
-{syllabus_summary}
-
-## Course Statistics
-- **Average GPA**: {existing_summary.get('average_gpa', 'N/A')}
-- **Average Hours**: {existing_summary.get('average_hours', 'N/A')}
-- **Professor Rating**: {existing_summary.get('prof_ratings', 'N/A')}/5.0
-- **Course Rating**: {existing_summary.get('course_ratings', 'N/A')}/5.0
-"""
-        else:
-            summary_content = f"""
-# Course Summary
-
-## Syllabus Overview
-{syllabus_summary}
-
-## Course Statistics
-*No course statistics available yet.*
-"""
-        
-        return StudyFeatureResponse(
-            id=existing_summary["id"] if existing_summary else str(uuid.uuid4()),
-            content=summary_content,
-            created=existing_summary["created_at"] if existing_summary else datetime.now().isoformat()
-        )
-        
-    except Exception as e:
-        logger.error(f"Get summary error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
-
-@app.post("/notebooks/{notebook_id}/generate-summary/", response_model=StudyFeatureResponse)
-async def generate_summary(notebook_id: str):
-    """Generate a comprehensive summary for a notebook"""
-    if not notebook_exists(notebook_id):
-        raise HTTPException(status_code=404, detail="Notebook not found")
-    
-    try:
-        # Get documents for this notebook
-        res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
-        documents = res.data or []
-        
-        if not documents:
-            raise HTTPException(status_code=400, detail="No documents found for this notebook")
-        
-        # Get existing summary data
-        summary_res = supabase.table("summary").select("*").eq("notebook_id", notebook_id).execute()
-        existing_summary = summary_res.data[0] if summary_res.data else None
-        
-        # Create a brief summary prompt
-        summary_prompt = f"""
-        Based on the uploaded documents for this notebook, create a brief 2-3 sentence summary of the syllabus content.
-        Focus on the main topics and key concepts covered in the course materials.
-        Keep it concise and informative.
-        """
-        
-        # Use MCP client to generate summary
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="query_index_for_notebook_tool",
-                arguments={"question": summary_prompt, "notebook_id": notebook_id}
-            )
-        
-        if not result.content or len(result.content) == 0:
+        if not summary_content:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
-        
-        summary_content = result.content[0].text
         
         # Store/update the summary in the summary table
         summary_data = {
@@ -674,6 +535,49 @@ async def generate_summary(notebook_id: str):
         )
         
     except Exception as e:
+        logger.error(f"Get summary error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
+
+@app.post("/notebooks/{notebook_id}/generate-summary/", response_model=StudyFeatureResponse)
+async def generate_summary(notebook_id: str):
+    """Generate a comprehensive summary for a notebook"""
+    if not notebook_exists(notebook_id):
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    
+    try:
+        # Get documents for this notebook
+        res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
+        documents = res.data or []
+        
+        if not documents:
+            raise HTTPException(status_code=400, detail="No documents found for this notebook")
+        
+        # Get existing summary data
+        summary_res = supabase.table("summary").select("*").eq("notebook_id", notebook_id).execute()
+        existing_summary = summary_res.data[0] if summary_res.data else None
+        
+        # Create a brief summary prompt
+        summary_prompt = f"""
+        Based on the uploaded documents for this notebook, create a brief 2-3 sentence summary of the syllabus content.
+        Focus on the main topics and key concepts covered in the course materials.
+        Keep it concise and informative.
+        """
+        
+        # Use MCP client to generate summary
+        result = await query_index_for_notebook(summary_prompt, notebook_id)
+        
+        if not result.content or len(result.content) == 0:
+            raise HTTPException(status_code=500, detail="Failed to generate summary")
+        
+        summary_content = result.content[0].text
+        
+        return StudyFeatureResponse(
+            id=str(uuid.uuid4()),
+            content=summary_content,
+            created=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
         logger.error(f"Summary generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
 
@@ -722,17 +626,11 @@ async def generate_sample_exam(notebook_id: str):
         Continue this pattern for exactly 5 questions. Generate questions that would be appropriate for a midterm or final exam in this subject area.
         """
         
-        # Use MCP client to generate exam questions
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="query_index_for_notebook_tool",
-                arguments={"question": exam_prompt, "notebook_id": notebook_id}
-            )
+        # Use direct function to generate exam questions
+        exam_content = await query_index_for_notebook(exam_prompt, notebook_id)
         
-        if not result.content or len(result.content) == 0:
+        if not exam_content:
             raise HTTPException(status_code=500, detail="Failed to generate exam questions")
-        
-        exam_content = result.content[0].text
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -781,17 +679,11 @@ async def generate_flashcards(notebook_id: str):
         Continue this pattern for 20-30 flashcards covering the most important content from the documents.
         """
         
-        # Use MCP client to generate flashcards
-        async with mcp_pool.get_client() as client:
-            result = await client.call_tool(
-                tool_name="query_index_for_notebook_tool",
-                arguments={"question": flashcard_prompt, "notebook_id": notebook_id}
-            )
+        # Use direct function to generate flashcards
+        flashcard_content = await query_index_for_notebook(flashcard_prompt, notebook_id)
         
-        if not result.content or len(result.content) == 0:
+        if not flashcard_content:
             raise HTTPException(status_code=500, detail="Failed to generate flashcards")
-        
-        flashcard_content = result.content[0].text
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),

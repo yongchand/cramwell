@@ -1,22 +1,5 @@
 #!/bin/bash
 
-# Start the MCP server in the background
-echo "Starting MCP server..."
-uv run python -m src.cramwell.server &
-MCP_PID=$!
-
-# Wait for MCP server to be ready
-echo "Waiting for MCP server to be ready..."
-sleep 10
-
-# Start the API server in the background on port 8001
+# Start the API server on port 8001
 echo "Starting API server on port 8001..."
-uv run uvicorn src.cramwell.api_server:app --host 0.0.0.0 --port 8001 &
-API_PID=$!
-
-# Wait for API server to be ready
-echo "Waiting for API server to be ready..."
-sleep 5
-
-# Wait for all processes
-wait $MCP_PID $API_PID 
+uv run uvicorn src.cramwell.api_server:app --host 0.0.0.0 --port 8001 

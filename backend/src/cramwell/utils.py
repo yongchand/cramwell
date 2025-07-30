@@ -272,6 +272,7 @@ async def process_file_for_notebook(
     Process a file and create embeddings specific to a notebook using Pinecone.
     This function processes the file and adds it to the notebook's Pinecone index.
     """
+    text = None
     try:
         # Resolve file path - try multiple locations
         file_path = filename
@@ -295,25 +296,41 @@ async def process_file_for_notebook(
             print(f"Could not parse file: {file_path}")
             return None, None
         
-        # Create document dict for Pinecone
-        document = {
-            "text": text,
-            "filename": os.path.basename(file_path),  # Use just the filename, not the full path
-            "notebook_id": notebook_id,
-            "processed_at": datetime.now().isoformat()
-        }
+        # Process text in chunks to reduce memory usage
+        chunk_size = 10000  # Process 10KB chunks
+        text_chunks = []
         
-        # Add document to Pinecone index for this notebook
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            text_chunks.append(chunk)
+        
+        # Create document dict for Pinecone with chunked content
+        documents = []
+        for i, chunk in enumerate(text_chunks):
+            document = {
+                "text": chunk,
+                "filename": os.path.basename(file_path),
+                "notebook_id": notebook_id,
+                "chunk_index": i,
+                "total_chunks": len(text_chunks),
+                "processed_at": datetime.now().isoformat()
+            }
+            documents.append(document)
+        
+        # Add documents to Pinecone index for this notebook
         success = await pinecone_service.add_documents_to_notebook(
             notebook_id=notebook_id,
-            documents=[document],
+            documents=documents,
             metadata={"filename": os.path.basename(file_path)}
         )
         
+        # Clean up large variables immediately
+        del text
+        del text_chunks
+        del documents
+        
         if success:
-            # Don't store document metadata here since frontend already creates it
-            # The frontend handles the database record creation
-            return "Document processed and added to notebook index", text
+            return "Document processed and added to notebook index", f"Processed {len(text_chunks)} chunks"
         
         return None, None
         
@@ -323,6 +340,9 @@ async def process_file_for_notebook(
         traceback.print_exc()
         return None, None
     finally:
+        # Clean up any remaining large variables
+        if text is not None:
+            del text
         # Force garbage collection after processing
         import gc
         gc.collect()

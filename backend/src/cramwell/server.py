@@ -19,7 +19,7 @@ try:
 except Exception as e:
     print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
 
-mcp: FastMCP = FastMCP(name="MCP For NotebookLM")
+mcp: FastMCP = FastMCP(name="MCP For Cramwell")
 
 # Health check tool
 @mcp.tool(
