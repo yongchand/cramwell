@@ -135,11 +135,13 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LLM_STRUCT = openai_client
 LLM_VERIFIER = openai_client
 
-
-
-
-
-
+# Cache DocumentConverter at module level
+try:
+    from docling.document_converter import DocumentConverter
+    DOC_CONVERTER = DocumentConverter()
+except Exception as e:
+    DOC_CONVERTER = None
+    print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
 
 
 async def parse_file(
@@ -151,41 +153,31 @@ async def parse_file(
     images: Optional[List[str]] = None
     text: Optional[str] = None
     tables: Optional[List[pd.DataFrame]] = None
-    converter = None
     
     try:
-        # Use Docling to parse the document
-        from docling.document_converter import DocumentConverter
-        
-        converter = DocumentConverter()
+        # Use cached DocumentConverter
+        if DOC_CONVERTER is None:
+            from docling.document_converter import DocumentConverter
+            converter = DocumentConverter()
+        else:
+            converter = DOC_CONVERTER
         result = converter.convert(file_path)
-        
         # Extract text content from markdown
         text = result.document.export_to_markdown()
-        
         # Extract tables if requested
         if with_tables:
             tables = []
-            # Docling might have table extraction capabilities
-            # For now, we'll return empty list
-        
         # Extract images if requested
         if with_images:
             images = []
-            # Docling might have image extraction capabilities
-            # For now, we'll return empty list
-        
         return text, images, tables
-        
     except Exception as e:
         print(f"Error parsing file {file_path}: {e}")
         import traceback
         traceback.print_exc()
         return None, None, None
     finally:
-        # Explicitly clean up converter
-        if converter:
-            del converter
+        # Do not delete the cached converter
         # Force garbage collection
         import gc
         gc.collect()
