@@ -1,4 +1,4 @@
-from .utils import get_mind_map, process_file, query_index, process_file_for_notebook, query_index_for_notebook
+from .utils import get_mind_map, process_file, query_index, process_file_for_notebook, query_index_for_notebook, DOC_CONVERTER
 from .pinecone_service import pinecone_service
 from fastmcp import FastMCP
 from typing import List, Union, Literal
@@ -7,6 +7,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "streamable-http")
+
+# Pre-load DocumentConverter at server startup to download models early
+print("Initializing DocumentConverter and downloading models...")
+try:
+    # This will trigger the cached instance creation in utils.py
+    if DOC_CONVERTER is None:
+        print("DocumentConverter not available")
+    else:
+        print("DocumentConverter initialized successfully")
+except Exception as e:
+    print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
 
 mcp: FastMCP = FastMCP(name="MCP For NotebookLM")
 
