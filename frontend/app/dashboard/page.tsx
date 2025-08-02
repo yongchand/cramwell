@@ -175,7 +175,47 @@ export default function DashboardPage() {
     };
     fetchMyCourses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+  }, []); // Keep empty dependency array for initial load
+
+  // Add a new useEffect to refetch when enrollment changes
+  useEffect(() => {
+
+    const refetchOnMount = async () => {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) return;
+      
+      // Get updated enrollment data
+      const { data: userNotebooks, error: userNotebooksError } = await supabase
+        .from("user_notebooks")
+        .select("notebook_id")
+        .eq("user_id", userId)
+        .eq("active", true);
+      if (userNotebooksError || !userNotebooks) return;
+      
+      const notebookIds = userNotebooks.map((un: any) => un.notebook_id);
+      setEnrolledIds(notebookIds);
+      
+      if (notebookIds.length === 0) {
+        setMyCourses([]);
+        return;
+      }
+      
+      // Fetch updated notebook data
+      const { data: myNotebooks, error: myNotebooksError } = await supabase
+        .from("notebooks")
+        .select("*")
+        .in("id", notebookIds);
+      if (!myNotebooksError && myNotebooks) {
+        setMyCourses(myNotebooks);
+      }
+    };
+    
+    // Refetch when component mounts (after refresh) or when enrollment state changes
+    refetchOnMount();
+  }, [enrolledIds.length]); // Refetch when enrollment count changes
 
   const handleUpload = (files: FileList | File[]) => {
     // TODO: Implement actual upload logic
@@ -224,30 +264,15 @@ export default function DashboardPage() {
           .eq("user_id", userId)
           .eq("notebook_id", notebookId);
       } else {
-        const { data: existingRows } = await supabase
-          .from("user_notebooks")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("notebook_id", notebookId)
-          .limit(1);
-        if (existingRows && existingRows.length > 0) {
-          await supabase
-            .from("user_notebooks")
-            .update({ active: true })
-            .eq("user_id", userId)
-            .eq("notebook_id", notebookId);
-        } else {
-          const id = uuidv4();
-          await supabase
-            .from("user_notebooks")
-            .insert({
-              id,
-              user_id: userId,
-              notebook_id: notebookId,
-              active: true,
-              created_at: new Date().toISOString(),
-            });
-        }
+        await supabase
+        .upsert({
+          user_id: userId,
+          notebook_id: notebookId,
+          active: true,
+          created_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,notebook_id'
+        });
       }
     } catch (err) {
       // Revert optimistic update on error
@@ -356,23 +381,59 @@ export default function DashboardPage() {
                   <motion.div
                     key={nb.id}
                     data-aos="fade-up"
-                    whileHover={{ scale: 1.08, boxShadow: "0 8px 32px 0 rgba(124,37,41,0.16)" }}
-                    whileTap={{ scale: 0.97 }}
-                    className="relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md cursor-pointer transition-transform duration-200"
-                    onClick={() => router.push(`/notebook/${nb.id}`)}
-                    tabIndex={0}
-                    role="button"
-                    onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/notebook/${nb.id}`); }}
-                    aria-label={`Open notebook ${nb.name}`}
+                    whileHover={{ scale: isEnrolled ? 1.08 : 1.02, boxShadow: isEnrolled ? "0 8px 32px 0 rgba(124,37,41,0.16)" : "0 4px 16px 0 rgba(0,0,0,0.1)" }}
+                    whileTap={{ scale: isEnrolled ? 0.97 : 1 }}
+                    className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
+                    onClick={isEnrolled ? () => router.push(`/notebook/${nb.id}`) : undefined}
+                    tabIndex={isEnrolled ? 0 : -1}
+                    role={isEnrolled ? "button" : "article"}
+                    onKeyDown={isEnrolled ? (e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/notebook/${nb.id}`); } : undefined}
+                    aria-label={isEnrolled ? `Open notebook ${nb.name}` : `Course ${nb.name} - not enrolled`}
                   >
-                    {/* Flip button */}
-                    <button
-                      onClick={(e) => toggleCardFlip(nb.id, e)}
-                      className="absolute top-2 right-2 z-20 p-1 rounded-full bg-uchicago-crimson/10 hover:bg-uchicago-crimson/20 transition-colors"
-                      title="View statistics"
-                    >
-                      <RotateCcw className="w-4 h-4 text-uchicago-crimson" />
-                    </button>
+
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="flex-shrink-0 bg-uchicago-crimson/10 rounded-full p-2">
+                        <GraduationCap className="w-6 h-6 text-uchicago-crimson animate-bounce group-hover:animate-spin" />
+                      </div>
+                      <div className="font-bold text-lg truncate" title={nb.name}>{nb.name}</div>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                      {nb.professor}
+                    </div>
+                    <div className="text-base text-gray-700 dark:text-gray-200 mb-4 whitespace-pre-line break-words font-medium leading-relaxed">
+                      {nb.description}
+                    </div>
+                    <div className="flex items-center justify-between mt-auto pt-2">
+                      <button
+                        onClick={(e) => toggleCardFlip(nb.id, e)}
+                        className="px-2 py-1 rounded-full bg-uchicago-crimson text-white text-xs font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
+                        title="View course summary"
+                      >
+                        {isFlipped ? "Course Overview" : "Course Summary"}
+                      </button>
+                      <Button
+                        variant={isEnrolled ? "destructive" : "outline"}
+                        className={
+                          isEnrolled
+                            ? "rounded-full px-6 py-1 text-sm font-semibold shadow-none"
+                            : "rounded-full px-6 py-1 text-sm font-semibold border-uchicago-crimson text-uchicago-crimson hover:bg-uchicago-crimson/10 shadow-none"
+                        }
+                        disabled={enrollLoadingId === nb.id}
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (!isEnrolled) {
+                            setShowConfetti(true);
+                            setTimeout(() => setShowConfetti(false), 2000);
+                          }
+                          handleEnrollToggle(nb.id, isEnrolled);
+                        }}
+                      >
+                        {enrollLoadingId === nb.id ? (
+                          <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                        ) : null}
+                        {isEnrolled ? "Disenroll" : "Enroll"}
+                      </Button>
+                    </div>
                     
                     {/* Statistics overlay */}
                     {isFlipped && (
@@ -404,46 +465,16 @@ export default function DashboardPage() {
                               <p className="text-xs opacity-75 mt-1">Be the first to review!</p>
                             </div>
                           )}
+                          <button
+                            onClick={(e) => toggleCardFlip(nb.id, e)}
+                            className="mt-4 px-3 py-1.5 rounded-full bg-white text-uchicago-crimson text-xs font-semibold hover:bg-gray-100 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                            title="Back to course details"
+                          >
+                            Back to Course
+                          </button>
                         </div>
                       </div>
                     )}
-                    
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="flex-shrink-0 bg-uchicago-crimson/10 rounded-full p-2">
-                        <GraduationCap className="w-6 h-6 text-uchicago-crimson animate-bounce group-hover:animate-spin" />
-                      </div>
-                      <div className="font-bold text-lg truncate" title={nb.name}>{nb.name}</div>
-                    </div>
-                    <div className="text-base text-gray-700 dark:text-gray-200 mb-4 whitespace-pre-line break-words font-medium leading-relaxed">
-                      {nb.description}
-                    </div>
-                    <div className="flex items-center justify-between mt-auto pt-2">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">
-                        {nb.professor}
-                      </span>
-                      <Button
-                        variant={isEnrolled ? "destructive" : "outline"}
-                        className={
-                          isEnrolled
-                            ? "rounded-full px-6 py-1 text-sm font-semibold shadow-none"
-                            : "rounded-full px-6 py-1 text-sm font-semibold border-uchicago-crimson text-uchicago-crimson hover:bg-uchicago-crimson/10 shadow-none"
-                        }
-                        disabled={enrollLoadingId === nb.id}
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (!isEnrolled) {
-                            setShowConfetti(true);
-                            setTimeout(() => setShowConfetti(false), 2000);
-                          }
-                          handleEnrollToggle(nb.id, isEnrolled);
-                        }}
-                      >
-                        {enrollLoadingId === nb.id ? (
-                          <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                        ) : null}
-                        {isEnrolled ? "Disenroll" : "Enroll"}
-                      </Button>
-                    </div>
                     {/* Confetti burst */}
                     <AnimatePresence>
                       {showConfetti && (
@@ -520,23 +551,57 @@ export default function DashboardPage() {
                     <motion.div
                       key={nb.id}
                       data-aos="fade-up"
-                      whileHover={{ scale: 1.08, boxShadow: "0 8px 32px 0 rgba(124,37,41,0.16)" }}
-                      whileTap={{ scale: 0.97 }}
-                      className="relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md cursor-pointer transition-transform duration-200"
-                      onClick={() => router.push(`/notebook/${nb.id}`)}
-                      tabIndex={0}
-                      role="button"
-                      onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/notebook/${nb.id}`); }}
-                      aria-label={`Open notebook ${nb.name}`}
+                      whileHover={{ scale: isEnrolled ? 1.08 : 1.02, boxShadow: isEnrolled ? "0 8px 32px 0 rgba(124,37,41,0.16)" : "0 4px 16px 0 rgba(0,0,0,0.1)" }}
+                      whileTap={{ scale: isEnrolled ? 0.97 : 1 }}
+                      className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
+                      onClick={isEnrolled ? () => router.push(`/notebook/${nb.id}`) : undefined}
+                      tabIndex={isEnrolled ? 0 : -1}
+                      role={isEnrolled ? "button" : "article"}
+                      onKeyDown={isEnrolled ? (e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/notebook/${nb.id}`); } : undefined}
+                      aria-label={isEnrolled ? `Open notebook ${nb.name}` : `Course ${nb.name} - not enrolled`}
                     >
-                      {/* Flip button */}
-                      <button
-                        onClick={(e) => toggleCardFlip(nb.id, e)}
-                        className="absolute top-2 right-2 z-20 p-1 rounded-full bg-uchicago-crimson/10 hover:bg-uchicago-crimson/20 transition-colors"
-                        title="View statistics"
-                      >
-                        <RotateCcw className="w-4 h-4 text-uchicago-crimson" />
-                      </button>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex-shrink-0 bg-uchicago-crimson/10 rounded-full p-2">
+                          <GraduationCap className="w-6 h-6 text-uchicago-crimson animate-bounce group-hover:animate-spin" />
+                        </div>
+                        <div className="font-bold text-lg truncate" title={nb.name}>{nb.name}</div>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                        {nb.professor}
+                      </div>
+                      <div className="text-base text-gray-700 dark:text-gray-200 mb-4 whitespace-pre-line break-words font-medium leading-relaxed">
+                        {nb.description}
+                      </div>
+                      <div className="flex items-center justify-between mt-auto pt-2">
+                        <button
+                          onClick={(e) => toggleCardFlip(nb.id, e)}
+                          className="px-2 py-1 rounded-full bg-uchicago-crimson text-white text-xs font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
+                          title="View course summary"
+                        >
+                          {isFlipped ? "Course Overview" : "Course Summary"}
+                        </button>
+                        <Button
+                          variant={isEnrolled ? "destructive" : "outline"}
+                          className={
+                            isEnrolled
+                              ? "rounded-full px-6 py-1 text-sm font-semibold shadow-none"
+                              : "rounded-full px-6 py-1 text-sm font-semibold border-uchicago-crimson text-uchicago-crimson hover:bg-uchicago-crimson/10 shadow-none"
+                          }
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (!isEnrolled) {
+                              setShowConfetti(true);
+                              setTimeout(() => setShowConfetti(false), 2000);
+                            }
+                            handleEnrollToggle(nb.id, isEnrolled);
+                          }}
+                        >
+                          {enrollLoadingId === nb.id ? (
+                            <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                          ) : null}
+                          {isEnrolled ? "Disenroll" : "Enroll"}
+                        </Button>
+                      </div>
                       
                       {/* Statistics overlay */}
                       {isFlipped && (
@@ -568,45 +633,16 @@ export default function DashboardPage() {
                                 <p className="text-xs opacity-75 mt-1">Be the first to review!</p>
                               </div>
                             )}
+                            <button
+                              onClick={(e) => toggleCardFlip(nb.id, e)}
+                              className="mt-4 px-3 py-1.5 rounded-full bg-white text-uchicago-crimson text-xs font-semibold hover:bg-gray-100 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                              title="Back to course details"
+                            >
+                              Back to Course
+                            </button>
                           </div>
                         </div>
                       )}
-                      
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex-shrink-0 bg-uchicago-crimson/10 rounded-full p-2">
-                          <GraduationCap className="w-6 h-6 text-uchicago-crimson animate-bounce group-hover:animate-spin" />
-                        </div>
-                        <div className="font-bold text-lg truncate" title={nb.name}>{nb.name}</div>
-                      </div>
-                      <div className="text-base text-gray-700 dark:text-gray-200 mb-4 whitespace-pre-line break-words font-medium leading-relaxed">
-                        {nb.description}
-                      </div>
-                      <div className="flex items-center justify-between mt-auto pt-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">
-                          {nb.professor}
-                        </span>
-                        <Button
-                          variant={isEnrolled ? "destructive" : "outline"}
-                          className={
-                            isEnrolled
-                              ? "rounded-full px-6 py-1 text-sm font-semibold shadow-none"
-                              : "rounded-full px-6 py-1 text-sm font-semibold border-uchicago-crimson text-uchicago-crimson hover:bg-uchicago-crimson/10 shadow-none"
-                          }
-                          onClick={e => {
-                            e.stopPropagation();
-                            if (!isEnrolled) {
-                              setShowConfetti(true);
-                              setTimeout(() => setShowConfetti(false), 2000);
-                            }
-                            handleEnrollToggle(nb.id, isEnrolled);
-                          }}
-                        >
-                          {enrollLoadingId === nb.id ? (
-                            <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                          ) : null}
-                          {isEnrolled ? "Disenroll" : "Enroll"}
-                        </Button>
-                      </div>
                     </motion.div>
                   );
                 })}
