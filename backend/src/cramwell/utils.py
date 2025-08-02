@@ -135,10 +135,18 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 LLM_STRUCT = openai_client
 LLM_VERIFIER = openai_client
 
-# Cache DocumentConverter at module level
+# Cache DocumentConverter at module level with memory-optimized settings
 try:
     from docling.document_converter import DocumentConverter
-    DOC_CONVERTER = DocumentConverter()
+    # Configure Docling with memory-optimized settings
+    DOC_CONVERTER = DocumentConverter(
+        # Use only one OCR engine instead of all 5 to reduce memory usage
+        ocr_engines=['easyocr'],  # Reduces memory from ~1.5GB to ~300MB
+        # Disable image processing to save memory
+        with_images=False,
+        # Force CPU-only processing to avoid GPU memory usage
+        device='cpu'
+    )
 except Exception as e:
     DOC_CONVERTER = None
     print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
@@ -158,7 +166,12 @@ async def parse_file(
         # Use cached DocumentConverter
         if DOC_CONVERTER is None:
             from docling.document_converter import DocumentConverter
-            converter = DocumentConverter()
+            # Use memory-optimized settings for fallback converter
+            converter = DocumentConverter(
+                ocr_engines=['easyocr'],
+                with_images=False,
+                device='cpu'
+            )
         else:
             converter = DOC_CONVERTER
         result = converter.convert(file_path)
@@ -273,6 +286,8 @@ async def process_file_for_notebook(
     This function processes the file and adds it to the notebook's Pinecone index.
     """
     text = None
+    text_chunks = None
+    documents = None
     try:
         # Resolve file path - try multiple locations
         file_path = filename
@@ -324,13 +339,19 @@ async def process_file_for_notebook(
             metadata={"filename": os.path.basename(file_path)}
         )
         
+        # Store chunk count before cleanup
+        chunk_count = len(text_chunks) if text_chunks else 0
+        
         # Clean up large variables immediately
-        del text
-        del text_chunks
-        del documents
+        if text is not None:
+            del text
+        if text_chunks is not None:
+            del text_chunks
+        if documents is not None:
+            del documents
         
         if success:
-            return "Document processed and added to notebook index", f"Processed {len(text_chunks)} chunks"
+            return "Document processed and added to notebook index", f"Processed {chunk_count} chunks"
         
         return None, None
         
@@ -343,6 +364,10 @@ async def process_file_for_notebook(
         # Clean up any remaining large variables
         if text is not None:
             del text
+        if text_chunks is not None:
+            del text_chunks
+        if documents is not None:
+            del documents
         # Force garbage collection after processing
         import gc
         gc.collect()
