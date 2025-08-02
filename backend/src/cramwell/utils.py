@@ -152,11 +152,54 @@ except Exception as e:
     print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
 
 
-async def parse_file(
+async def parse_file_pymupdf(
     file_path: str, with_images: bool = False, with_tables: bool = False
 ) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
     """
-    Parse a file using Docling for better document processing.
+    Parse a file using PyMuPDF for lightweight document processing.
+    """
+    images: Optional[List[str]] = None
+    text: Optional[str] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    
+    try:
+        import fitz  # PyMuPDF
+        
+        # Open and extract text
+        doc = fitz.open(file_path)
+        text = ""
+        
+        for page in doc:
+            text += page.get_text()
+        
+        doc.close()
+        
+        # Extract tables if requested (simplified)
+        if with_tables:
+            tables = []
+        
+        # Extract images if requested (simplified)
+        if with_images:
+            images = []
+        
+        return text, images, tables
+        
+    except Exception as e:
+        print(f"Error parsing file with PyMuPDF {file_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        # Force garbage collection
+        import gc
+        gc.collect()
+
+
+async def parse_file_docling(
+    file_path: str, with_images: bool = False, with_tables: bool = False
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse a file using Docling for advanced document processing (OCR, tables, etc.).
     """
     images: Optional[List[str]] = None
     text: Optional[str] = None
@@ -194,15 +237,80 @@ async def parse_file(
             images = []
         return text, images, tables
     except Exception as e:
-        print(f"Error parsing file {file_path}: {e}")
+        print(f"Error parsing file with Docling {file_path}: {e}")
         import traceback
         traceback.print_exc()
         return None, None, None
     finally:
-        # Do not delete the cached converter
         # Force garbage collection
         import gc
         gc.collect()
+
+
+def is_handwritten_or_poor_extraction(text: str) -> bool:
+    """
+    Check if the extracted text suggests handwritten content or poor extraction.
+    """
+    if not text or len(text.strip()) < 50:
+        return True  # Too little text extracted
+    
+    # Check for common handwritten indicators
+    handwritten_indicators = [
+        "handwritten", "handwriting", "scanned", "image", "photo",
+        "unreadable", "illegible", "blurry", "fuzzy"
+    ]
+    
+    text_lower = text.lower()
+    for indicator in handwritten_indicators:
+        if indicator in text_lower:
+            return True
+    
+    # Check if text looks like OCR output (lots of random characters)
+    if len(text) > 100:
+        # Count non-alphanumeric characters
+        non_alphanumeric = sum(1 for c in text if not c.isalnum() and not c.isspace())
+        ratio = non_alphanumeric / len(text)
+        if ratio > 0.3:  # More than 30% non-alphanumeric suggests OCR issues
+            return True
+    
+    return False
+
+
+async def parse_file(
+    file_path: str, with_images: bool = False, with_tables: bool = False
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Smart hybrid parsing: Use PyMuPDF as default, fallback to Docling for handwritten notes.
+    """
+    print(f"Starting smart parsing for: {file_path}")
+    
+    # Try PyMuPDF first (fast and lightweight)
+    print("Trying PyMuPDF extraction...")
+    text, images, tables = await parse_file_pymupdf(file_path, with_images, with_tables)
+    
+    if text and len(text.strip()) > 50:
+        # Check if extraction quality is good
+        if not is_handwritten_or_poor_extraction(text):
+            print("PyMuPDF extraction successful - using lightweight method")
+            return text, images, tables
+        else:
+            print("PyMuPDF detected poor extraction quality")
+    else:
+        print("PyMuPDF extracted little or no text")
+    
+    # Fallback to Docling for better extraction
+    print("🔄 Falling back to Docling for better extraction...")
+    try:
+        text, images, tables = await parse_file_docling(file_path, with_images, with_tables)
+        if text and len(text.strip()) > 50:
+            print("✅ Docling extraction successful")
+            return text, images, tables
+        else:
+            print("❌ Both PyMuPDF and Docling failed to extract meaningful text")
+            return None, None, None
+    except Exception as e:
+        print(f"❌ Docling fallback failed: {e}")
+        return None, None, None
 
 
 async def process_file(
