@@ -166,11 +166,20 @@ async def parse_file(
         # Use cached DocumentConverter
         if DOC_CONVERTER is None:
             from docling.document_converter import DocumentConverter
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.datamodel.base_models import InputFormat
+            from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+            from docling.document_converter import (DocumentConverter,PdfFormatOption,WordFormatOption)
+
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = False
+            pipeline_options.do_table_structure = True
             # Use memory-optimized settings for fallback converter
             converter = DocumentConverter(
-                ocr_engines=['easyocr'],
-                with_images=False,
-                device='cpu'
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                                        pipeline_options=pipeline_options, backend=PyPdfiumDocumentBackend), # pipeline options go here.
+                }
             )
         else:
             converter = DOC_CONVERTER
