@@ -370,13 +370,22 @@ async def process_file_for_notebook(
         traceback.print_exc()
         return None, None
     finally:
-        # Clean up any remaining large variables
-        if text is not None:
-            del text
-        if text_chunks is not None:
-            del text_chunks
-        if documents is not None:
-            del documents
+        # Clean up any remaining large variables - use try/except to handle unbound variables
+        try:
+            if 'text' in locals() and text is not None:
+                del text
+        except UnboundLocalError:
+            pass
+        try:
+            if 'text_chunks' in locals() and text_chunks is not None:
+                del text_chunks
+        except UnboundLocalError:
+            pass
+        try:
+            if 'documents' in locals() and documents is not None:
+                del documents
+        except UnboundLocalError:
+            pass
         # Force garbage collection after processing
         import gc
         gc.collect()
