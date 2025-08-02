@@ -265,14 +265,15 @@ export default function DashboardPage() {
           .eq("notebook_id", notebookId);
       } else {
         await supabase
-        .upsert({
-          user_id: userId,
-          notebook_id: notebookId,
-          active: true,
-          created_at: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id,notebook_id'
-        });
+          .from("user_notebooks")
+          .upsert({
+            user_id: userId,
+            notebook_id: notebookId,
+            active: true,
+            created_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,notebook_id'
+          });
       }
     } catch (err) {
       // Revert optimistic update on error
