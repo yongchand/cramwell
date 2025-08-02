@@ -178,44 +178,6 @@ export default function DashboardPage() {
 
   }, []); // Keep empty dependency array for initial load
 
-  // Add a useEffect that runs only on mount to ensure fresh data after refresh
-  useEffect(() => {
-    const refetchOnMount = async () => {
-      const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) return;
-      
-      // Get updated enrollment data
-      const { data: userNotebooks, error: userNotebooksError } = await supabase
-        .from("user_notebooks")
-        .select("notebook_id")
-        .eq("user_id", userId)
-        .eq("active", true);
-      if (userNotebooksError || !userNotebooks) return;
-      
-      const notebookIds = userNotebooks.map((un: any) => un.notebook_id);
-      setEnrolledIds(notebookIds);
-      
-      if (notebookIds.length === 0) {
-        setMyCourses([]);
-        return;
-      }
-      
-      // Fetch updated notebook data
-      const { data: myNotebooks, error: myNotebooksError } = await supabase
-        .from("notebooks")
-        .select("*")
-        .in("id", notebookIds);
-      if (!myNotebooksError && myNotebooks) {
-        setMyCourses(myNotebooks);
-      }
-    };
-    
-    // Only run this on mount, not on every enrollment change
-    refetchOnMount();
-  }, []); // Empty dependency array means it only runs on mount
-
   const handleUpload = (files: FileList | File[]) => {
     // TODO: Implement actual upload logic
   };
@@ -263,16 +225,32 @@ export default function DashboardPage() {
           .eq("user_id", userId)
           .eq("notebook_id", notebookId);
       } else {
-        await supabase
+        // Check if record exists first
+        const { data: existingRows } = await supabase
           .from("user_notebooks")
-          .upsert({
-            user_id: userId,
-            notebook_id: notebookId,
-            active: true,
-            created_at: new Date().toISOString(),
-          }, {
-            onConflict: 'user_id,notebook_id'
-          });
+          .select("id")
+          .eq("user_id", userId)
+          .eq("notebook_id", notebookId)
+          .limit(1);
+        
+        if (existingRows && existingRows.length > 0) {
+          // Update existing record
+          await supabase
+            .from("user_notebooks")
+            .update({ active: true })
+            .eq("user_id", userId)
+            .eq("notebook_id", notebookId);
+        } else {
+          // Insert new record
+          await supabase
+            .from("user_notebooks")
+            .insert({
+              user_id: userId,
+              notebook_id: notebookId,
+              active: true,
+              created_at: new Date().toISOString(),
+            });
+        }
       }
     } catch (err) {
       // Revert optimistic update on error
