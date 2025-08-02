@@ -178,45 +178,6 @@ export default function DashboardPage() {
 
   }, []); // Keep empty dependency array for initial load
 
-  // Add a new useEffect to refetch when enrollment changes
-  useEffect(() => {
-
-    const refetchOnMount = async () => {
-      const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) return;
-      
-      // Get updated enrollment data
-      const { data: userNotebooks, error: userNotebooksError } = await supabase
-        .from("user_notebooks")
-        .select("notebook_id")
-        .eq("user_id", userId)
-        .eq("active", true);
-      if (userNotebooksError || !userNotebooks) return;
-      
-      const notebookIds = userNotebooks.map((un: any) => un.notebook_id);
-      setEnrolledIds(notebookIds);
-      
-      if (notebookIds.length === 0) {
-        setMyCourses([]);
-        return;
-      }
-      
-      // Fetch updated notebook data
-      const { data: myNotebooks, error: myNotebooksError } = await supabase
-        .from("notebooks")
-        .select("*")
-        .in("id", notebookIds);
-      if (!myNotebooksError && myNotebooks) {
-        setMyCourses(myNotebooks);
-      }
-    };
-    
-    // Refetch when component mounts (after refresh) or when enrollment state changes
-    refetchOnMount();
-  }, [enrolledIds.length]); // Refetch when enrollment count changes
-
   const handleUpload = (files: FileList | File[]) => {
     // TODO: Implement actual upload logic
   };
