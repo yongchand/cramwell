@@ -361,7 +361,7 @@ export default function DashboardPage() {
                     data-aos="fade-up"
                     whileHover={{ scale: isEnrolled ? 1.08 : 1.02, boxShadow: isEnrolled ? "0 8px 32px 0 rgba(124,37,41,0.16)" : "0 4px 16px 0 rgba(0,0,0,0.1)" }}
                     whileTap={{ scale: isEnrolled ? 0.97 : 1 }}
-                    className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
+                    className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
                     onClick={isEnrolled ? () => router.push(`/notebook/${nb.id}`) : undefined}
                     tabIndex={isEnrolled ? 0 : -1}
                     role={isEnrolled ? "button" : "article"}
@@ -531,7 +531,7 @@ export default function DashboardPage() {
                       data-aos="fade-up"
                       whileHover={{ scale: isEnrolled ? 1.08 : 1.02, boxShadow: isEnrolled ? "0 8px 32px 0 rgba(124,37,41,0.16)" : "0 4px 16px 0 rgba(0,0,0,0.1)" }}
                       whileTap={{ scale: isEnrolled ? 0.97 : 1 }}
-                      className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden backdrop-blur-md transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`relative rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-gray-100 dark:border-gray-800 flex flex-col justify-between min-h-[220px] p-6 group overflow-hidden transition-transform duration-200 ${isEnrolled ? 'cursor-pointer' : 'cursor-default'}`}
                       onClick={isEnrolled ? () => router.push(`/notebook/${nb.id}`) : undefined}
                       tabIndex={isEnrolled ? 0 : -1}
                       role={isEnrolled ? "button" : "article"}

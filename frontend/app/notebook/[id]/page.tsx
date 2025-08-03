@@ -1270,8 +1270,38 @@ export default function NotebookPage() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 px-2 max-h-[calc(100vh-200px)]">
             {sessionLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="flex flex-col items-center justify-center h-full space-y-6">
+                {/* Mascot and Loading Animation */}
+                <div className="relative">
+                  {/* Mascot */}
+                  <div className="w-24 h-24 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                    <div className="text-white text-4xl">🎓</div>
+                  </div>
+                  
+                  {/* Floating dots around mascot */}
+                  <div className="absolute -top-2 -left-2 w-3 h-3 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="absolute -top-2 -right-2 w-3 h-3 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="absolute -bottom-2 -right-2 w-3 h-3 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.6s' }}></div>
+                </div>
+                
+                {/* Loading Text */}
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-semibold text-uchicago-crimson">Loading your course...</h3>
+                  <p className="text-sm text-muted-foreground">Preparing your study materials</p>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-uchicago-crimson to-uchicago-maroon rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
+                
+                {/* Loading Dots */}
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-2 h-2 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
               </div>
             ) : (
               <>
@@ -1307,10 +1337,27 @@ export default function NotebookPage() {
                 ))}
                 {isSending && (
                   <div className="flex justify-start">
-                    <Card className="max-w-[80%] bg-muted/70 text-card-foreground shadow-lg rounded-2xl px-6 py-4">
-                      <CardContent className="p-0 flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <p className="text-base text-muted-foreground">Generating response...</p>
+                    <Card className="max-w-[80%] bg-gradient-to-r from-uchicago-crimson/10 to-uchicago-maroon/10 text-card-foreground shadow-lg rounded-2xl px-6 py-4 border border-uchicago-crimson/20">
+                      <CardContent className="p-0 flex items-center gap-3">
+                        {/* Animated mascot for response generation */}
+                        <div className="relative">
+                          <div className="w-8 h-8 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-md animate-pulse">
+                            <div className="text-white text-sm">🎓</div>
+                          </div>
+                          {/* Small floating dots */}
+                          <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                          <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-base text-uchicago-crimson font-medium">Generating response...</p>
+                          <p className="text-xs text-muted-foreground mt-1">Analyzing your course materials</p>
+                        </div>
+                        {/* Animated dots */}
+                        <div className="flex space-x-1">
+                          <div className="w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                          <div className="w-1.5 h-1.5 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -1370,8 +1417,8 @@ export default function NotebookPage() {
             >
               {isSending ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                  Sending...
+                  <div className="w-4 h-4 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full animate-pulse mr-2"></div>
+                  <span className="text-xs">Thinking...</span>
                 </>
               ) : (
                 <Send className="h-4 w-4" />
