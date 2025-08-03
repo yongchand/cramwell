@@ -403,7 +403,7 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
 
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
-@limiter.limit("30/minute")
+@limiter.limit("30/5 minutes")
 async def send_chat_message(http_request: Request, notebook_id: str, request: ChatMessageRequest):
     """Send a chat message for a specific notebook"""
     if not notebook_exists(notebook_id):
