@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import asyncio
@@ -11,6 +12,9 @@ import json
 import aiohttp
 import logging
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook, get_cached_study_feature, cache_study_feature, clear_cached_study_feature
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
@@ -27,7 +31,92 @@ load_dotenv()
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8001"))
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Initialize security
+security = HTTPBearer(auto_error=False)
+
+def sanitize_error_message(error: Exception) -> str:
+    """
+    Sanitize error messages to prevent sensitive information leakage.
+    """
+    error_str = str(error).lower()
+    
+    # Define safe error messages for different error types
+    if any(keyword in error_str for keyword in ["file not found", "no such file", "file does not exist"]):
+        return "File not found or inaccessible"
+    elif any(keyword in error_str for keyword in ["permission denied", "access denied", "forbidden"]):
+        return "Access denied"
+    elif any(keyword in error_str for keyword in ["timeout", "timed out"]):
+        return "Request timed out"
+    elif any(keyword in error_str for keyword in ["memory", "out of memory"]):
+        return "System resource limit exceeded"
+    elif any(keyword in error_str for keyword in ["database", "sql", "connection"]):
+        return "Database operation failed"
+    elif any(keyword in error_str for keyword in ["api", "openai", "pinecone"]):
+        return "External service unavailable"
+    else:
+        return "An internal error occurred"
+
+
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[str]:
+    """
+    Validate JWT token and return user ID.
+    For now, this is a simplified implementation.
+    In production, you should properly validate JWT tokens.
+    """
+    if not credentials:
+        return None
+    
+    try:
+        # For now, we'll use a simple token validation
+        # In production, you should validate against Supabase Auth
+        token = credentials.credentials
+        
+        # Simple token format validation (user_id:timestamp)
+        if ":" in token:
+            user_id = token.split(":")[0]
+            # Add proper JWT validation here
+            return user_id
+        else:
+            return None
+    except Exception as e:
+        logger.error(f"Token validation error: {e}")
+        return None
+
+
+async def require_auth(user_id: Optional[str] = Depends(get_current_user)) -> str:
+    """
+    Require authentication for protected endpoints.
+    """
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    return user_id
+
+
+async def verify_notebook_access(notebook_id: str, user_id: str) -> bool:
+    """
+    Verify that the user has access to the notebook.
+    """
+    try:
+        # Check if the notebook belongs to the user
+        res = supabase.table("notebooks").select("user_id").eq("id", notebook_id).single().execute()
+        if res.data and res.data.get("user_id") == user_id:
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Error verifying notebook access: {e}")
+        return False
+
 app = FastAPI(title="Cramwell API", version="1.0.0")
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware
 app.add_middleware(
@@ -160,7 +249,7 @@ async def root():
     return {"message": "Cramwell API"}
 
 @app.get("/notebooks/", response_model=List[NotebookResponse])
-async def get_notebooks():
+async def get_notebooks(user_id: str = Depends(require_auth)):
     """Get all notebooks from Supabase"""
     res = supabase.table("notebooks").select("*").eq("archived", False).execute()
     notebooks = res.data or []
@@ -176,7 +265,7 @@ async def get_notebooks():
     ]
 
 @app.post("/notebooks/", response_model=NotebookResponse)
-async def create_notebook(request: CreateNotebookRequest):
+async def create_notebook(request: CreateNotebookRequest, user_id: str = Depends(require_auth)):
     """Create a new notebook in Supabase"""
     now = datetime.now().isoformat()
     data = {
@@ -198,7 +287,7 @@ async def create_notebook(request: CreateNotebookRequest):
     )
 
 @app.get("/notebooks/{notebook_id}", response_model=NotebookResponse)
-async def get_notebook(notebook_id: str):
+async def get_notebook(notebook_id: str, user_id: str = Depends(require_auth)):
     """Get a specific notebook from Supabase"""
     res = supabase.table("notebooks").select("*").eq("id", notebook_id).single().execute()
     nb = res.data
@@ -214,7 +303,7 @@ async def get_notebook(notebook_id: str):
     )
 
 @app.put("/notebooks/{notebook_id}", response_model=NotebookResponse)
-async def update_notebook(notebook_id: str, request: CreateNotebookRequest):
+async def update_notebook(notebook_id: str, request: CreateNotebookRequest, user_id: str = Depends(require_auth)):
     """Update a notebook in Supabase"""
     now = datetime.now().isoformat()
     data = {
@@ -234,7 +323,7 @@ async def update_notebook(notebook_id: str, request: CreateNotebookRequest):
     )
 
 @app.delete("/notebooks/{notebook_id}")
-async def delete_notebook(notebook_id: str):
+async def delete_notebook(notebook_id: str, user_id: str = Depends(require_auth)):
     """Delete a notebook from Supabase"""
     res = supabase.table("notebooks").delete().eq("id", notebook_id).execute()
     if not res.data:
@@ -245,10 +334,15 @@ async def delete_notebook(notebook_id: str):
 # TODO: Migrate these to Supabase as well. For now, remove all in-memory checks and raise NotImplementedError or return empty lists.
 
 @app.post("/notebooks/{notebook_id}/upload/", response_model=SourceResponse)
-async def upload_source(notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review"):
+@limiter.limit("5/minute")
+async def upload_source(notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: str = Depends(require_auth)):
     """Upload and process a file for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
+    
+    # Verify user has access to this notebook
+    if not await verify_notebook_access(notebook_id, user_id):
+        raise HTTPException(status_code=403, detail="Access denied to this notebook")
     
     # Validate file type
     allowed_types = [".pdf", ".docx", ".txt", ".md", ".html"]
@@ -307,7 +401,8 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
         logger.error(f"Upload error: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
     finally:
         # Clean up temporary file
         if os.path.exists(temp_file_path):
@@ -318,6 +413,7 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
 
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
+@limiter.limit("30/minute")
 async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
     """Send a chat message for a specific notebook"""
     if not notebook_exists(notebook_id):
@@ -387,7 +483,8 @@ async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 
 @app.get("/notebooks/{notebook_id}/chat/", response_model=List[ChatMessageResponse])
@@ -420,7 +517,8 @@ async def get_chat_history(notebook_id: str, user_id: str):
         ]
     except Exception as e:
         logger.error(f"Chat history error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 
 @app.get("/notebooks/{notebook_id}/sources", response_model=List[SourceResponse])
@@ -445,7 +543,8 @@ async def get_sources(notebook_id: str):
         ]
     except Exception as e:
         logger.error(f"Sources error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch sources: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 # The rest of the endpoints (study features, etc.) should be similarly stubbed or migrated as needed.
 
@@ -545,9 +644,11 @@ async def get_summary(notebook_id: str):
         
     except Exception as e:
         logger.error(f"Get summary error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 @app.post("/notebooks/{notebook_id}/generate-summary/", response_model=StudyFeatureResponse)
+@limiter.limit("10/minute")
 async def generate_summary(notebook_id: str):
     """Generate a comprehensive summary for a notebook"""
     if not notebook_exists(notebook_id):
@@ -601,9 +702,11 @@ async def generate_summary(notebook_id: str):
         
     except Exception as e:
         logger.error(f"Summary generation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 @app.post("/notebooks/{notebook_id}/generate-sample-exam/", response_model=StudyFeatureResponse)
+@limiter.limit("10/minute")
 async def generate_sample_exam(notebook_id: str):
     """Generate sample exam questions for a notebook"""
     if not notebook_exists(notebook_id):
@@ -677,9 +780,11 @@ async def generate_sample_exam(notebook_id: str):
         
     except Exception as e:
         logger.error(f"Exam generation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate exam: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 @app.post("/notebooks/{notebook_id}/generate-flashcards/", response_model=StudyFeatureResponse)
+@limiter.limit("10/minute")
 async def generate_flashcards(notebook_id: str):
     """Generate flashcards for a notebook"""
     if not notebook_exists(notebook_id):
@@ -745,7 +850,8 @@ async def generate_flashcards(notebook_id: str):
         
     except Exception as e:
         logger.error(f"Flashcard generation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate flashcards: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 
 @app.delete("/notebooks/{notebook_id}/clear-cache/")
@@ -778,7 +884,8 @@ async def clear_study_features_cache(notebook_id: str, feature_type: Optional[st
                 
     except Exception as e:
         logger.error(f"Cache clearing error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 
 if __name__ == "__main__":

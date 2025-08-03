@@ -138,15 +138,22 @@ LLM_VERIFIER = openai_client
 # Cache DocumentConverter at module level with memory-optimized settings
 try:
     from docling.document_converter import DocumentConverter
-    # Configure Docling with memory-optimized settings
-    DOC_CONVERTER = DocumentConverter(
-        # Use only one OCR engine instead of all 5 to reduce memory usage
-        ocr_engines=['easyocr'],  # Reduces memory from ~1.5GB to ~300MB
-        # Disable image processing to save memory
-        with_images=False,
-        # Force CPU-only processing to avoid GPU memory usage
-        device='cpu'
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.base_models import InputFormat
+    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+    from docling.document_converter import (DocumentConverter,PdfFormatOption,WordFormatOption)
+
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.do_ocr = False
+    pipeline_options.do_table_structure = True
+    # Use memory-optimized settings for fallback converter
+    converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(
+                                pipeline_options=pipeline_options, backend=PyPdfiumDocumentBackend), # pipeline options go here.
+        }
     )
+    DOC_CONVERTER = converter
 except Exception as e:
     DOC_CONVERTER = None
     print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
