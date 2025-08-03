@@ -86,15 +86,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         return None
 
 
-async def require_auth(user_id: Optional[str] = Depends(get_current_user)) -> str:
+async def require_auth(user_id: Optional[str] = Depends(get_current_user)) -> Optional[str]:
     """
-    Require authentication for protected endpoints.
+    Optional authentication for endpoints.
+    Returns user_id if authenticated, None otherwise.
     """
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required"
-        )
     return user_id
 
 
@@ -249,7 +245,7 @@ async def root():
     return {"message": "Cramwell API"}
 
 @app.get("/notebooks/", response_model=List[NotebookResponse])
-async def get_notebooks(user_id: str = Depends(require_auth)):
+async def get_notebooks(user_id: Optional[str] = Depends(require_auth)):
     """Get all notebooks from Supabase"""
     res = supabase.table("notebooks").select("*").eq("archived", False).execute()
     notebooks = res.data or []
@@ -265,7 +261,7 @@ async def get_notebooks(user_id: str = Depends(require_auth)):
     ]
 
 @app.post("/notebooks/", response_model=NotebookResponse)
-async def create_notebook(request: CreateNotebookRequest, user_id: str = Depends(require_auth)):
+async def create_notebook(request: CreateNotebookRequest, user_id: Optional[str] = Depends(require_auth)):
     """Create a new notebook in Supabase"""
     now = datetime.now().isoformat()
     data = {
@@ -287,7 +283,7 @@ async def create_notebook(request: CreateNotebookRequest, user_id: str = Depends
     )
 
 @app.get("/notebooks/{notebook_id}", response_model=NotebookResponse)
-async def get_notebook(notebook_id: str, user_id: str = Depends(require_auth)):
+async def get_notebook(notebook_id: str, user_id: Optional[str] = Depends(require_auth)):
     """Get a specific notebook from Supabase"""
     res = supabase.table("notebooks").select("*").eq("id", notebook_id).single().execute()
     nb = res.data
@@ -303,7 +299,7 @@ async def get_notebook(notebook_id: str, user_id: str = Depends(require_auth)):
     )
 
 @app.put("/notebooks/{notebook_id}", response_model=NotebookResponse)
-async def update_notebook(notebook_id: str, request: CreateNotebookRequest, user_id: str = Depends(require_auth)):
+async def update_notebook(notebook_id: str, request: CreateNotebookRequest, user_id: Optional[str] = Depends(require_auth)):
     """Update a notebook in Supabase"""
     now = datetime.now().isoformat()
     data = {
@@ -323,7 +319,7 @@ async def update_notebook(notebook_id: str, request: CreateNotebookRequest, user
     )
 
 @app.delete("/notebooks/{notebook_id}")
-async def delete_notebook(notebook_id: str, user_id: str = Depends(require_auth)):
+async def delete_notebook(notebook_id: str, user_id: Optional[str] = Depends(require_auth)):
     """Delete a notebook from Supabase"""
     res = supabase.table("notebooks").delete().eq("id", notebook_id).execute()
     if not res.data:
@@ -335,13 +331,13 @@ async def delete_notebook(notebook_id: str, user_id: str = Depends(require_auth)
 
 @app.post("/notebooks/{notebook_id}/upload/", response_model=SourceResponse)
 @limiter.limit("5/minute")
-async def upload_source(request: Request, notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: str = Depends(require_auth)):
+async def upload_source(request: Request, notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: Optional[str] = Depends(require_auth)):
     """Upload and process a file for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
-    # Verify user has access to this notebook
-    if not await verify_notebook_access(notebook_id, user_id):
+    # Verify user has access to this notebook (optional for now)
+    if user_id and not await verify_notebook_access(notebook_id, user_id):
         raise HTTPException(status_code=403, detail="Access denied to this notebook")
     
     # Validate file type
