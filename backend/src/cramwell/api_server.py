@@ -557,11 +557,13 @@ async def generate_summary(notebook_id: str):
         # Check if summary is already cached
         cached_summary = await get_cached_study_feature(notebook_id, "summary")
         if cached_summary:
+            logger.info(f"Returning cached summary for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_summary,
                 created=datetime.now().isoformat()
             )
+        logger.info(f"No cached summary found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -581,16 +583,15 @@ async def generate_summary(notebook_id: str):
         Keep it concise and informative.
         """
         
-        # Use MCP client to generate summary
-        result = await query_index_for_notebook(summary_prompt, notebook_id)
+        # Use direct function to generate summary
+        summary_content = await query_index_for_notebook(summary_prompt, notebook_id)
         
-        if not result.content or len(result.content) == 0:
+        if not summary_content:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
         
-        summary_content = result.content[0].text
-        
         # Cache the generated summary
-        await cache_study_feature(notebook_id, "summary", summary_content)
+        cache_success = await cache_study_feature(notebook_id, "summary", summary_content)
+        logger.info(f"Cache result for summary: {cache_success}")
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -612,11 +613,13 @@ async def generate_sample_exam(notebook_id: str):
         # Check if exam is already cached
         cached_exam = await get_cached_study_feature(notebook_id, "exam")
         if cached_exam:
+            logger.info(f"Returning cached exam for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_exam,
                 created=datetime.now().isoformat()
             )
+        logger.info(f"No cached exam found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -663,7 +666,8 @@ async def generate_sample_exam(notebook_id: str):
             raise HTTPException(status_code=500, detail="Failed to generate exam questions")
         
         # Cache the generated exam
-        await cache_study_feature(notebook_id, "exam", exam_content)
+        cache_success = await cache_study_feature(notebook_id, "exam", exam_content)
+        logger.info(f"Cache result for exam: {cache_success}")
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -685,11 +689,13 @@ async def generate_flashcards(notebook_id: str):
         # Check if flashcards are already cached
         cached_flashcards = await get_cached_study_feature(notebook_id, "flashcards")
         if cached_flashcards:
+            logger.info(f"Returning cached flashcards for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_flashcards,
                 created=datetime.now().isoformat()
             )
+        logger.info(f"No cached flashcards found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -728,7 +734,8 @@ async def generate_flashcards(notebook_id: str):
             raise HTTPException(status_code=500, detail="Failed to generate flashcards")
         
         # Cache the generated flashcards
-        await cache_study_feature(notebook_id, "flashcards", flashcard_content)
+        cache_success = await cache_study_feature(notebook_id, "flashcards", flashcard_content)
+        logger.info(f"Cache result for flashcards: {cache_success}")
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),

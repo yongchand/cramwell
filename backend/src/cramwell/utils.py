@@ -508,19 +508,34 @@ async def query_index_for_notebook(question: str, notebook_id: str) -> Union[str
     This function queries only documents from the specified notebook.
     """
     try:
+        print(f"Querying notebook {notebook_id} with question: {question[:100]}...")
+        
         # Query the notebook-specific Pinecone index
         raw_response = await pinecone_service.query_notebook(notebook_id, question)
         
+        print(f"Raw response type: {type(raw_response)}")
+        print(f"Raw response: {raw_response[:200] if raw_response else 'None'}")
+        
         if not raw_response:
+            print("No raw response received")
             return None
         
         # Format the response using template
-        formatted_response = format_response_with_template(raw_response, question)
-        
-        return formatted_response
+        try:
+            formatted_response = format_response_with_template(raw_response, question)
+            print(f"Formatted response type: {type(formatted_response)}")
+            print(f"Formatted response: {formatted_response[:200] if formatted_response else 'None'}")
+            return formatted_response
+        except Exception as e:
+            print(f"Error formatting response with template: {e}")
+            # Fallback to raw response
+            print(f"Using raw response as fallback")
+            return raw_response
         
     except Exception as e:
         print(f"Error in query_index_for_notebook: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -581,10 +596,13 @@ async def get_cached_study_feature(notebook_id: str, feature_type: str) -> Optio
         The cached content if found, None otherwise
     """
     try:
+        print(f"Checking cache for {feature_type} in notebook {notebook_id}")
         result = supabase.table("study_features_cache").select("content").eq("notebook_id", notebook_id).eq("feature_type", feature_type).execute()
         
         if result.data and len(result.data) > 0:
+            print(f"Found cached {feature_type} for notebook {notebook_id}")
             return result.data[0]["content"]
+        print(f"No cached {feature_type} found for notebook {notebook_id}")
         return None
     except Exception as e:
         print(f"Error retrieving cached {feature_type} for notebook {notebook_id}: {e}")
@@ -604,6 +622,7 @@ async def cache_study_feature(notebook_id: str, feature_type: str, content: str)
         True if successful, False otherwise
     """
     try:
+        print(f"Caching {feature_type} for notebook {notebook_id}")
         # Use upsert to handle both insert and update cases
         result = supabase.table("study_features_cache").upsert({
             "notebook_id": notebook_id,
@@ -611,6 +630,7 @@ async def cache_study_feature(notebook_id: str, feature_type: str, content: str)
             "content": content
         }).execute()
         
+        print(f"Successfully cached {feature_type} for notebook {notebook_id}")
         return True
     except Exception as e:
         print(f"Error caching {feature_type} for notebook {notebook_id}: {e}")

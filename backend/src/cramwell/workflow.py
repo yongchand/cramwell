@@ -67,7 +67,9 @@ class NotebookLMWorkflow(Workflow):
         result = await mcp_client.call_tool(
             tool_name="process_file_tool", arguments={"filename": ev.file}
         )
-        split_result = result.content[0].text.split("\n%separator%\n")
+        # Handle string responses (MCP tools return strings)
+        result_text = str(result)
+        split_result = result_text.split("\n%separator%\n")
         json_data = split_result[0]
         md_text = split_result[1]
         if json_data == "Sorry, your file could not be processed.":
@@ -100,7 +102,9 @@ class NotebookLMWorkflow(Workflow):
             tool_name="process_file_for_notebook_tool", 
             arguments={"filename": ev.file, "notebook_id": ev.notebook_id}
         )
-        split_result = result.content[0].text.split("\n%separator%\n")
+        # Handle string responses (MCP tools return strings)
+        result_text = str(result)
+        split_result = result_text.split("\n%separator%\n")
         json_data = split_result[0]
         md_text = split_result[1]
         if json_data == "Sorry, your file could not be processed.":
@@ -134,8 +138,10 @@ class NotebookLMWorkflow(Workflow):
             arguments={"summary": ev.summary, "highlights": ev.highlights},
         )
         if result is not None:
+            # Handle string responses (MCP tools return strings)
+            mind_map_text = str(result)
             return NotebookOutputEvent(
-                mind_map=result.content[0].text,
+                mind_map=mind_map_text,
                 **ev.model_dump(
                     include={
                         "summary",
@@ -175,8 +181,10 @@ class NotebookLMWorkflow(Workflow):
             arguments={"summary": ev.summary, "highlights": ev.highlights},
         )
         if result is not None:
+            # Handle string responses (MCP tools return strings)
+            mind_map_text = str(result)
             return NotebookOutputEvent(
-                mind_map=result.content[0].text,
+                mind_map=mind_map_text,
                 **ev.model_dump(
                     include={
                         "summary",
