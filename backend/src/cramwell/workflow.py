@@ -24,7 +24,6 @@ class NotebookFileInputEvent(StartEvent):
 
 
 class NotebookOutputEvent(StopEvent):
-    mind_map: str
     md_content: str
     summary: str
     highlights: List[str]
@@ -32,21 +31,7 @@ class NotebookOutputEvent(StopEvent):
     answers: List[str]
 
 
-class MindMapCreationEvent(Event):
-    summary: str
-    highlights: List[str]
-    questions: List[str]
-    answers: List[str]
-    md_content: str
 
-
-class NotebookMindMapCreationEvent(Event):
-    summary: str
-    highlights: List[str]
-    questions: List[str]
-    answers: List[str]
-    md_content: str
-    notebook_id: str
 
 
 def get_mcp_client(*args, **kwargs) -> BasicMCPClient:
@@ -60,7 +45,7 @@ class NotebookLMWorkflow(Workflow):
         ev: FileInputEvent,
         mcp_client: Annotated[BasicMCPClient, Resource(get_mcp_client)],
         ctx: Context,
-    ) -> Union[MindMapCreationEvent, NotebookOutputEvent]:
+    ) -> NotebookOutputEvent:
         ctx.write_event_to_stream(
             ev=ev,
         )
@@ -74,7 +59,6 @@ class NotebookLMWorkflow(Workflow):
         md_text = split_result[1]
         if json_data == "Sorry, your file could not be processed.":
             return NotebookOutputEvent(
-                mind_map="Unprocessable file, sorry😭",
                 md_content="",
                 summary="",
                 highlights=[],
@@ -82,7 +66,7 @@ class NotebookLMWorkflow(Workflow):
                 answers=[],
             )
         json_rep = json.loads(json_data)
-        return MindMapCreationEvent(
+        return NotebookOutputEvent(
             md_content=md_text,
             **json_rep,
         )
@@ -93,7 +77,7 @@ class NotebookLMWorkflow(Workflow):
         ev: NotebookFileInputEvent,
         mcp_client: Annotated[BasicMCPClient, Resource(get_mcp_client)],
         ctx: Context,
-    ) -> Union[NotebookMindMapCreationEvent, NotebookOutputEvent]:
+    ) -> NotebookOutputEvent:
         """Extract file data for a specific notebook context"""
         ctx.write_event_to_stream(
             ev=ev,
@@ -109,7 +93,6 @@ class NotebookLMWorkflow(Workflow):
         md_text = split_result[1]
         if json_data == "Sorry, your file could not be processed.":
             return NotebookOutputEvent(
-                mind_map="Unprocessable file, sorry😭",
                 md_content="",
                 summary="",
                 highlights=[],
@@ -117,93 +100,10 @@ class NotebookLMWorkflow(Workflow):
                 answers=[],
             )
         json_rep = json.loads(json_data)
-        return NotebookMindMapCreationEvent(
+        return NotebookOutputEvent(
             notebook_id=ev.notebook_id,
             md_content=md_text,
             **json_rep,
         )
 
-    @step
-    async def generate_mind_map(
-        self,
-        ev: MindMapCreationEvent,
-        mcp_client: Annotated[BasicMCPClient, Resource(get_mcp_client)],
-        ctx: Context,
-    ) -> NotebookOutputEvent:
-        ctx.write_event_to_stream(
-            ev=ev,
-        )
-        result = await mcp_client.call_tool(
-            tool_name="get_mind_map_tool",
-            arguments={"summary": ev.summary, "highlights": ev.highlights},
-        )
-        if result is not None:
-            # Handle string responses (MCP tools return strings)
-            mind_map_text = str(result)
-            return NotebookOutputEvent(
-                mind_map=mind_map_text,
-                **ev.model_dump(
-                    include={
-                        "summary",
-                        "highlights",
-                        "questions",
-                        "answers",
-                        "md_content",
-                    }
-                ),
-            )
-        return NotebookOutputEvent(
-            mind_map="Sorry, mind map creation failed😭",
-            **ev.model_dump(
-                include={
-                    "summary",
-                    "highlights",
-                    "questions",
-                    "answers",
-                    "md_content",
-                }
-            ),
-        )
 
-    @step
-    async def generate_notebook_mind_map(
-        self,
-        ev: NotebookMindMapCreationEvent,
-        mcp_client: Annotated[BasicMCPClient, Resource(get_mcp_client)],
-        ctx: Context,
-    ) -> NotebookOutputEvent:
-        """Generate mind map for notebook-specific data"""
-        ctx.write_event_to_stream(
-            ev=ev,
-        )
-        result = await mcp_client.call_tool(
-            tool_name="get_mind_map_tool",
-            arguments={"summary": ev.summary, "highlights": ev.highlights},
-        )
-        if result is not None:
-            # Handle string responses (MCP tools return strings)
-            mind_map_text = str(result)
-            return NotebookOutputEvent(
-                mind_map=mind_map_text,
-                **ev.model_dump(
-                    include={
-                        "summary",
-                        "highlights",
-                        "questions",
-                        "answers",
-                        "md_content",
-                    }
-                ),
-            )
-        return NotebookOutputEvent(
-            mind_map="Sorry, mind map creation failed😭",
-            **ev.model_dump(
-                include={
-                    "summary",
-                    "highlights",
-                    "questions",
-                    "answers",
-                    "md_content",
-                }
-            ),
-        )

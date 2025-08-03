@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook, get_cached_study_feature, cache_study_feature, clear_cached_study_feature
+from .utils import process_file, query_index, process_file_for_notebook, query_index_for_notebook, get_cached_study_feature, cache_study_feature, clear_cached_study_feature
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
 from .database import supabase
 
@@ -335,7 +335,7 @@ async def delete_notebook(notebook_id: str, user_id: str = Depends(require_auth)
 
 @app.post("/notebooks/{notebook_id}/upload/", response_model=SourceResponse)
 @limiter.limit("5/minute")
-async def upload_source(notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: str = Depends(require_auth)):
+async def upload_source(request: Request, notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: str = Depends(require_auth)):
     """Upload and process a file for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
@@ -414,7 +414,7 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
 @limiter.limit("30/minute")
-async def send_chat_message(notebook_id: str, request: ChatMessageRequest):
+async def send_chat_message(http_request: Request, notebook_id: str, request: ChatMessageRequest):
     """Send a chat message for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
@@ -649,7 +649,7 @@ async def get_summary(notebook_id: str):
 
 @app.post("/notebooks/{notebook_id}/generate-summary/", response_model=StudyFeatureResponse)
 @limiter.limit("10/minute")
-async def generate_summary(notebook_id: str):
+async def generate_summary(request: Request, notebook_id: str):
     """Generate a comprehensive summary for a notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
@@ -707,7 +707,7 @@ async def generate_summary(notebook_id: str):
 
 @app.post("/notebooks/{notebook_id}/generate-sample-exam/", response_model=StudyFeatureResponse)
 @limiter.limit("10/minute")
-async def generate_sample_exam(notebook_id: str):
+async def generate_sample_exam(request: Request, notebook_id: str):
     """Generate sample exam questions for a notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
@@ -785,7 +785,7 @@ async def generate_sample_exam(notebook_id: str):
 
 @app.post("/notebooks/{notebook_id}/generate-flashcards/", response_model=StudyFeatureResponse)
 @limiter.limit("10/minute")
-async def generate_flashcards(notebook_id: str):
+async def generate_flashcards(request: Request, notebook_id: str):
     """Generate flashcards for a notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
