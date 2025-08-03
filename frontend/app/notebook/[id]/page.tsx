@@ -116,15 +116,21 @@ export default function NotebookPage() {
   const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false)
   const [pastSessions, setPastSessions] = useState<ChatSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
 
   const [isHoveringLeft, setIsHoveringLeft] = useState(false)
   const [showFloatingButtons, setShowFloatingButtons] = useState(false)
 
   useEffect(() => {
-    loadNotebook()
-    loadSources()
-    loadChatHistory()
-    loadSummary()
+    setPageLoading(true)
+    Promise.all([
+      loadNotebook(),
+      loadSources(),
+      loadChatHistory(),
+      loadSummary()
+    ]).finally(() => {
+      setPageLoading(false)
+    })
   }, [notebookId])
 
   // Handle hover for floating buttons
@@ -1073,11 +1079,56 @@ export default function NotebookPage() {
     loadPastSessions()
   }
 
-  if (!notebook) {
+  if (pageLoading || !notebook) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p>Loading...</p>
+      <div className="min-h-screen bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon flex items-center justify-center">
+        <div className="text-center space-y-8">
+          {/* Main Loading Animation */}
+          <div className="relative">
+            {/* Central Circle */}
+            <div className="w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+              <div className="w-24 h-24 bg-gradient-to-br from-white to-white/80 rounded-full flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-xl">
+                  <div className="w-8 h-8 bg-white rounded-full animate-ping"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Orbiting Elements */}
+            <div className="absolute inset-0 animate-spin">
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"></div>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 w-4 h-4 bg-white/80 rounded-full shadow-lg"></div>
+              <div className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white/60 rounded-full shadow-lg"></div>
+              <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white/40 rounded-full shadow-lg"></div>
+            </div>
+          </div>
+          
+          {/* Loading Text */}
+          <div className="space-y-4">
+            <h1 className="text-3xl font-bold text-white">Loading Course</h1>
+            <p className="text-white/80 text-lg">Preparing your study environment</p>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-80 h-3 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+            <div className="h-full bg-white rounded-full animate-pulse" style={{ width: '75%' }}></div>
+          </div>
+          
+          {/* Loading Steps */}
+          <div className="flex justify-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+              <span className="text-white/80 text-sm">Loading course data</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <span className="text-white/80 text-sm">Preparing chat</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              <span className="text-white/80 text-sm">Ready</span>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1143,7 +1194,9 @@ export default function NotebookPage() {
             tabIndex={0}
           >
             {isUploading ? (
-              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-white" />
+              <div className="w-7 h-7 bg-gradient-to-br from-white/20 to-white/40 rounded-full animate-pulse flex items-center justify-center">
+                <div className="w-3 h-3 bg-white rounded-full"></div>
+              </div>
             ) : (
               <Upload className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
             )}
@@ -1178,9 +1231,28 @@ export default function NotebookPage() {
           </DialogHeader>
           <div className="max-h-96 overflow-y-auto">
             {sessionsLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-2 text-sm text-muted-foreground">Loading sessions...</p>
+              <div className="text-center py-6 space-y-4">
+                {/* Circle for sessions loading */}
+                <div className="relative mx-auto w-16 h-16">
+                  <div className="w-16 h-16 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                      <div className="w-5 h-5 bg-white rounded-full animate-ping"></div>
+                    </div>
+                  </div>
+                  {/* Floating dots */}
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-uchicago-crimson">Loading your sessions...</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Finding your past conversations</p>
+                </div>
+                {/* Loading dots */}
+                <div className="flex space-x-1 justify-center">
+                  <div className="w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
               </div>
             ) : pastSessions.length === 0 ? (
               <div className="text-center py-4">
@@ -1271,14 +1343,16 @@ export default function NotebookPage() {
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 px-2 max-h-[calc(100vh-200px)]">
             {sessionLoading ? (
               <div className="flex flex-col items-center justify-center h-full space-y-6">
-                {/* Mascot and Loading Animation */}
+                {/* Loading Animation */}
                 <div className="relative">
-                  {/* Mascot */}
+                  {/* Central Circle */}
                   <div className="w-24 h-24 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                    <div className="text-white text-4xl">🎓</div>
+                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                      <div className="w-8 h-8 bg-white rounded-full animate-ping"></div>
+                    </div>
                   </div>
                   
-                  {/* Floating dots around mascot */}
+                  {/* Floating dots around circle */}
                   <div className="absolute -top-2 -left-2 w-3 h-3 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
                   <div className="absolute -top-2 -right-2 w-3 h-3 bg-uchicago-maroon rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
@@ -1339,10 +1413,10 @@ export default function NotebookPage() {
                   <div className="flex justify-start">
                     <Card className="max-w-[80%] bg-gradient-to-r from-uchicago-crimson/10 to-uchicago-maroon/10 text-card-foreground shadow-lg rounded-2xl px-6 py-4 border border-uchicago-crimson/20">
                       <CardContent className="p-0 flex items-center gap-3">
-                        {/* Animated mascot for response generation */}
+                        {/* Animated circle for response generation */}
                         <div className="relative">
                           <div className="w-8 h-8 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-md animate-pulse">
-                            <div className="text-white text-sm">🎓</div>
+                            <div className="w-4 h-4 bg-white rounded-full animate-ping"></div>
                           </div>
                           {/* Small floating dots */}
                           <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-uchicago-crimson rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>

@@ -415,7 +415,7 @@ export default function DashboardPage() {
                     
                     {/* Statistics overlay */}
                     {isFlipped && (
-                      <div className="absolute inset-0 bg-uchicago-crimson/95 text-white rounded-2xl flex flex-col justify-center items-center p-6 z-10">
+                      <div className="absolute inset-0 bg-uchicago-crimson text-white rounded-2xl flex flex-col justify-center items-center p-6 z-10">
                         <div className="text-center">
                           <h3 className="text-lg font-bold mb-4">{nb.name}</h3>
                           {summary ? (
@@ -583,7 +583,7 @@ export default function DashboardPage() {
                       
                       {/* Statistics overlay */}
                       {isFlipped && (
-                        <div className="absolute inset-0 bg-uchicago-crimson/95 text-white rounded-2xl flex flex-col justify-center items-center p-6 z-10">
+                        <div className="absolute inset-0 bg-uchicago-crimson text-white rounded-2xl flex flex-col justify-center items-center p-6 z-10">
                           <div className="text-center">
                             <h3 className="text-lg font-bold mb-4">{nb.name}</h3>
                             {summary ? (
