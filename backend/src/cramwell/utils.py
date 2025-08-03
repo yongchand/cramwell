@@ -566,3 +566,71 @@ def verify_claim(
     )
     response_json = json.loads(response.choices[0].message.content)
     return response_json["claim_is_true"], response_json["supporting_citations"]
+
+
+# Study Features Cache Functions
+async def get_cached_study_feature(notebook_id: str, feature_type: str) -> Optional[str]:
+    """
+    Retrieve a cached study feature from the database.
+    
+    Args:
+        notebook_id: The notebook ID
+        feature_type: The type of feature ('summary', 'exam', 'flashcards')
+    
+    Returns:
+        The cached content if found, None otherwise
+    """
+    try:
+        result = supabase.table("study_features_cache").select("content").eq("notebook_id", notebook_id).eq("feature_type", feature_type).execute()
+        
+        if result.data and len(result.data) > 0:
+            return result.data[0]["content"]
+        return None
+    except Exception as e:
+        print(f"Error retrieving cached {feature_type} for notebook {notebook_id}: {e}")
+        return None
+
+
+async def cache_study_feature(notebook_id: str, feature_type: str, content: str) -> bool:
+    """
+    Cache a study feature in the database.
+    
+    Args:
+        notebook_id: The notebook ID
+        feature_type: The type of feature ('summary', 'exam', 'flashcards')
+        content: The content to cache
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Use upsert to handle both insert and update cases
+        result = supabase.table("study_features_cache").upsert({
+            "notebook_id": notebook_id,
+            "feature_type": feature_type,
+            "content": content
+        }).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Error caching {feature_type} for notebook {notebook_id}: {e}")
+        return False
+
+
+async def clear_cached_study_feature(notebook_id: str, feature_type: str) -> bool:
+    """
+    Clear a cached study feature from the database.
+    
+    Args:
+        notebook_id: The notebook ID
+        feature_type: The type of feature ('summary', 'exam', 'flashcards')
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        result = supabase.table("study_features_cache").delete().eq("notebook_id", notebook_id).eq("feature_type", feature_type).execute()
+        return True
+    except Exception as e:
+        print(f"Error clearing cached {feature_type} for notebook {notebook_id}: {e}")
+        return False

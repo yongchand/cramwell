@@ -12,7 +12,7 @@ import aiohttp
 import logging
 from dotenv import load_dotenv
 
-from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook
+from .utils import process_file, query_index, get_mind_map, process_file_for_notebook, query_index_for_notebook, get_cached_study_feature, cache_study_feature, clear_cached_study_feature
 from .workflow import NotebookLMWorkflow, FileInputEvent, NotebookOutputEvent
 from .database import supabase
 
@@ -282,6 +282,15 @@ async def upload_source(notebook_id: str, file: UploadFile = File(...), document
         del text_content
         del result
         
+        # Clear cached study features since new content was added
+        try:
+            await clear_cached_study_feature(notebook_id, "summary")
+            await clear_cached_study_feature(notebook_id, "exam")
+            await clear_cached_study_feature(notebook_id, "flashcards")
+            logger.info(f"Cleared study features cache for notebook {notebook_id} after upload")
+        except Exception as e:
+            logger.warning(f"Failed to clear cache after upload: {e}")
+        
         # Don't create a new document record since frontend already created one
         # Just return success response
         now = datetime.now().isoformat()
@@ -545,6 +554,15 @@ async def generate_summary(notebook_id: str):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
+        # Check if summary is already cached
+        cached_summary = await get_cached_study_feature(notebook_id, "summary")
+        if cached_summary:
+            return StudyFeatureResponse(
+                id=str(uuid.uuid4()),
+                content=cached_summary,
+                created=datetime.now().isoformat()
+            )
+        
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
         documents = res.data or []
@@ -571,6 +589,9 @@ async def generate_summary(notebook_id: str):
         
         summary_content = result.content[0].text
         
+        # Cache the generated summary
+        await cache_study_feature(notebook_id, "summary", summary_content)
+        
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
             content=summary_content,
@@ -588,6 +609,15 @@ async def generate_sample_exam(notebook_id: str):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
+        # Check if exam is already cached
+        cached_exam = await get_cached_study_feature(notebook_id, "exam")
+        if cached_exam:
+            return StudyFeatureResponse(
+                id=str(uuid.uuid4()),
+                content=cached_exam,
+                created=datetime.now().isoformat()
+            )
+        
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
         documents = res.data or []
@@ -632,6 +662,9 @@ async def generate_sample_exam(notebook_id: str):
         if not exam_content:
             raise HTTPException(status_code=500, detail="Failed to generate exam questions")
         
+        # Cache the generated exam
+        await cache_study_feature(notebook_id, "exam", exam_content)
+        
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
             content=exam_content,
@@ -649,6 +682,15 @@ async def generate_flashcards(notebook_id: str):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
+        # Check if flashcards are already cached
+        cached_flashcards = await get_cached_study_feature(notebook_id, "flashcards")
+        if cached_flashcards:
+            return StudyFeatureResponse(
+                id=str(uuid.uuid4()),
+                content=cached_flashcards,
+                created=datetime.now().isoformat()
+            )
+        
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
         documents = res.data or []
@@ -685,6 +727,9 @@ async def generate_flashcards(notebook_id: str):
         if not flashcard_content:
             raise HTTPException(status_code=500, detail="Failed to generate flashcards")
         
+        # Cache the generated flashcards
+        await cache_study_feature(notebook_id, "flashcards", flashcard_content)
+        
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
             content=flashcard_content,
@@ -694,6 +739,40 @@ async def generate_flashcards(notebook_id: str):
     except Exception as e:
         logger.error(f"Flashcard generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate flashcards: {str(e)}")
+
+
+@app.delete("/notebooks/{notebook_id}/clear-cache/")
+async def clear_study_features_cache(notebook_id: str, feature_type: Optional[str] = None):
+    """Clear cached study features for a notebook"""
+    if not notebook_exists(notebook_id):
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    
+    try:
+        if feature_type:
+            # Clear specific feature type
+            if feature_type not in ["summary", "exam", "flashcards"]:
+                raise HTTPException(status_code=400, detail="Invalid feature type. Must be 'summary', 'exam', or 'flashcards'")
+            
+            success = await clear_cached_study_feature(notebook_id, feature_type)
+            if success:
+                return {"message": f"Cleared {feature_type} cache for notebook {notebook_id}"}
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to clear {feature_type} cache")
+        else:
+            # Clear all feature types
+            success_summary = await clear_cached_study_feature(notebook_id, "summary")
+            success_exam = await clear_cached_study_feature(notebook_id, "exam")
+            success_flashcards = await clear_cached_study_feature(notebook_id, "flashcards")
+            
+            if success_summary and success_exam and success_flashcards:
+                return {"message": f"Cleared all study features cache for notebook {notebook_id}"}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to clear some or all cached features")
+                
+    except Exception as e:
+        logger.error(f"Cache clearing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn
