@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   title: 'Cramwell',
   description: 'Study together, hack professors',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: '/logo-icon.svg',
+    shortcut: '/logo-icon.svg',
     apple: '/logo-icon.svg',
   },
 }

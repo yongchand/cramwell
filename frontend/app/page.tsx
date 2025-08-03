@@ -21,11 +21,8 @@ export default async function LoginHeroPage() {
       <div className="absolute inset-0 bg-black/60 z-0" />
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
         <div className="mb-8">
-          <img src="/logo.svg?v=1" alt="Cramwell Logo" className="h-16 md:h-20" />
+          <img src="/logo.svg" alt="Cramwell Logo" className="h-20 md:h-24" />
         </div>
-        <h1 className="text-5xl md:text-6xl font-extrabold text-white drop-shadow-lg mb-10 text-center tracking-tight">
-          Cramwell
-        </h1>
         <LoginForm />
       </div>
     </div>

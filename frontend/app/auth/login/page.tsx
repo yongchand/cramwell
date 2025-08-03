@@ -39,6 +39,9 @@ export default function LoginPage() {
     >
       <div className="absolute inset-0 bg-black/60 z-0" />
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
+        <div className="mb-8">
+          <img src="/logo.svg" alt="Cramwell Logo" className="h-20 md:h-24" />
+        </div>
         <div className="bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-gray-100 p-8 rounded-xl shadow-lg w-full border border-gray-200 dark:border-gray-800">
           <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
           {error && (
@@ -72,6 +75,11 @@ export default function LoginPage() {
           </div>
           <div className="text-center text-sm text-gray-600 dark:text-gray-400">
             <p>Only @uchicago.edu accounts are allowed</p>
+          </div>
+          <div className="mt-4 text-center">
+            <a href="/auth/signup" className="text-blue-600 dark:text-blue-400 hover:underline">
+              Don't have an account? Sign up
+            </a>
           </div>
         </div>
       </div>

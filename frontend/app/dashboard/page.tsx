@@ -264,9 +264,9 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Bar */}
-      <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#DC2626'}}>
+      <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#7C2529'}}>
         <div className="flex items-center gap-3">
-          <img src="/logo-icon.svg?v=1" alt="Cramwell" className="h-8 w-8" />
+          <img src="/logo-icon.svg" alt="Cramwell" className="h-8 w-8" />
           <div className="text-2xl font-extrabold text-white tracking-tight">Cramwell</div>
         </div>
         <div className="flex gap-3 items-center">
