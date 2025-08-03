@@ -24,8 +24,6 @@ def get_memory_usage():
 
 def monitor_memory(interval=5):
     """Monitor memory usage continuously."""
-    print("Memory Monitor Started")
-    print("=" * 50)
     
     try:
         while True:
@@ -35,17 +33,10 @@ def monitor_memory(interval=5):
             # Get memory info
             mem_info = get_memory_usage()
             
-            # Print memory usage
-            print(f"[{time.strftime('%H:%M:%S')}] "
-                  f"RSS: {mem_info['rss_mb']:.1f}MB, "
-                  f"VMS: {mem_info['vms_mb']:.1f}MB, "
-                  f"Percent: {mem_info['percent']:.1f}%, "
-                  f"Available: {mem_info['available_mb']:.1f}MB")
-            
             time.sleep(interval)
             
     except KeyboardInterrupt:
-        print("\nMemory monitoring stopped.")
+        pass
 
 if __name__ == "__main__":
     interval = int(sys.argv[1]) if len(sys.argv) > 1 else 5

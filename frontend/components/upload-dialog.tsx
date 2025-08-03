@@ -76,27 +76,22 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
   const handleUpload = async () => {
     // For general_review, allow upload without files
     if (kind === 'general_review' || selectedFiles.length > 0) {
-      console.log('Starting upload...');
       setIsUploadInProgress(true);
       setUploadSuccess(false);
       try {
-        console.log('Calling onUpload...');
         const metadata = kind === 'general_review' ? reviewMetadata : undefined;
         // For general_review, pass empty array if no files selected
         const filesToUpload = kind === 'general_review' && selectedFiles.length === 0 ? [] : selectedFiles;
         await onUpload(filesToUpload, kind, metadata);
-        console.log('Upload completed successfully');
         // Clear files after upload is complete
         setSelectedFiles([]);
         setUploadSuccess(true);
-        console.log('Upload successful - not closing dialog automatically');
         // Don't call onClose() here - let the parent handle it
       } catch (error) {
         // Error handling is done in the parent component
         console.error('Upload failed:', error);
         // Don't close dialog on error, let user see the error
       } finally {
-        console.log('Setting upload in progress to false');
         setIsUploadInProgress(false);
       }
     }
@@ -127,17 +122,13 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
 
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
-      console.log('Dialog onOpenChange:', { newOpen, isUploading, isUploadInProgress });
       // Prevent closing during upload
       if (!newOpen && (isUploading || isUploadInProgress)) {
-        console.log('Preventing dialog close during upload');
         return;
       }
       if (newOpen) {
-        console.log('Dialog opening - not calling onClose');
         return;
       }
-      console.log('Calling onClose');
       onClose();
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

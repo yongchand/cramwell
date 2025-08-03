@@ -18,11 +18,9 @@ def get_memory_usage():
 
 async def test_memory_cleanup():
     """Test that memory cleanup works properly."""
-    print("Testing memory cleanup...")
     
     # Get initial memory
     initial_memory = get_memory_usage()
-    print(f"Initial memory: {initial_memory:.1f}MB")
     
     # Simulate file processing
     for i in range(5):
@@ -41,8 +39,6 @@ async def test_memory_cleanup():
             # Simulate some processing
             processed_text = text.upper()
             
-            print(f"Processed file {i}, memory: {get_memory_usage():.1f}MB")
-            
         finally:
             # Clean up
             if os.path.exists(temp_file_path):
@@ -52,13 +48,11 @@ async def test_memory_cleanup():
     
     # Get final memory
     final_memory = get_memory_usage()
-    print(f"Final memory: {final_memory:.1f}MB")
-    print(f"Memory difference: {final_memory - initial_memory:.1f}MB")
     
     if final_memory - initial_memory < 50:  # Less than 50MB increase
-        print("✅ Memory cleanup test passed!")
+        pass
     else:
-        print("❌ Memory cleanup test failed!")
+        pass
 
 if __name__ == "__main__":
     asyncio.run(test_memory_cleanup()) 

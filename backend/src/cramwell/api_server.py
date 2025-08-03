@@ -82,7 +82,6 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         else:
             return None
     except Exception as e:
-        logger.error(f"Token validation error: {e}")
         return None
 
 
@@ -105,7 +104,6 @@ async def verify_notebook_access(notebook_id: str, user_id: str) -> bool:
             return True
         return False
     except Exception as e:
-        logger.error(f"Error verifying notebook access: {e}")
         return False
 
 app = FastAPI(title="Cramwell API", version="1.0.0")
@@ -144,19 +142,17 @@ async def memory_cleanup_task():
             import gc
             gc.collect()
             
-            # Log memory usage
+            # Check memory usage
             import psutil
             process = psutil.Process()
             memory_mb = process.memory_info().rss / 1024 / 1024
-            logger.info(f"Memory usage: {memory_mb:.1f}MB")
             
             # If memory usage is high, force more aggressive cleanup
             if memory_mb > 1000:  # 1GB threshold
-                logger.warning(f"High memory usage detected: {memory_mb:.1f}MB")
                 gc.collect()
                 
         except Exception as e:
-            logger.error(f"Error in memory cleanup task: {e}")
+            pass
         
         await asyncio.sleep(300)  # Run every 5 minutes
 
@@ -377,9 +373,8 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
             await clear_cached_study_feature(notebook_id, "summary")
             await clear_cached_study_feature(notebook_id, "exam")
             await clear_cached_study_feature(notebook_id, "flashcards")
-            logger.info(f"Cleared study features cache for notebook {notebook_id} after upload")
         except Exception as e:
-            logger.warning(f"Failed to clear cache after upload: {e}")
+            pass
         
         # Don't create a new document record since frontend already created one
         # Just return success response
@@ -394,7 +389,6 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
         )
             
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
         import traceback
         traceback.print_exc()
         sanitized_error = sanitize_error_message(e)
@@ -478,7 +472,6 @@ async def send_chat_message(http_request: Request, notebook_id: str, request: Ch
         )
         
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -512,7 +505,6 @@ async def get_chat_history(notebook_id: str, user_id: str):
             ) for msg in messages
         ]
     except Exception as e:
-        logger.error(f"Chat history error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -538,7 +530,6 @@ async def get_sources(notebook_id: str):
             ) for doc in documents
         ]
     except Exception as e:
-        logger.error(f"Sources error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -639,7 +630,6 @@ async def get_summary(notebook_id: str):
         )
         
     except Exception as e:
-        logger.error(f"Get summary error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -654,13 +644,11 @@ async def generate_summary(request: Request, notebook_id: str):
         # Check if summary is already cached
         cached_summary = await get_cached_study_feature(notebook_id, "summary")
         if cached_summary:
-            logger.info(f"Returning cached summary for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_summary,
                 created=datetime.now().isoformat()
             )
-        logger.info(f"No cached summary found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -687,8 +675,7 @@ async def generate_summary(request: Request, notebook_id: str):
             raise HTTPException(status_code=500, detail="Failed to generate summary")
         
         # Cache the generated summary
-        cache_success = await cache_study_feature(notebook_id, "summary", summary_content)
-        logger.info(f"Cache result for summary: {cache_success}")
+        await cache_study_feature(notebook_id, "summary", summary_content)
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -697,7 +684,6 @@ async def generate_summary(request: Request, notebook_id: str):
         )
         
     except Exception as e:
-        logger.error(f"Summary generation error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -712,13 +698,11 @@ async def generate_sample_exam(request: Request, notebook_id: str):
         # Check if exam is already cached
         cached_exam = await get_cached_study_feature(notebook_id, "exam")
         if cached_exam:
-            logger.info(f"Returning cached exam for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_exam,
                 created=datetime.now().isoformat()
             )
-        logger.info(f"No cached exam found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -729,7 +713,7 @@ async def generate_sample_exam(request: Request, notebook_id: str):
         
         # Create a comprehensive prompt for exam generation
         exam_prompt = f"""
-        Based on the uploaded documents for this notebook, generate exactly 5 comprehensive sample exam questions that would test understanding of the key concepts.
+        Based on the uploaded documents for this notebook, generate exactly 10 comprehensive sample exam questions that would test understanding of the key concepts.
 
         The questions should:
         1. Cover different difficulty levels (easy, medium, hard)
@@ -755,7 +739,7 @@ async def generate_sample_exam(request: Request, notebook_id: str):
            D) [Option]
            **Answer:** [Correct option]
 
-        Continue this pattern for exactly 5 questions. Generate questions that would be appropriate for a midterm or final exam in this subject area.
+        Continue this pattern for exactly 10 questions. Generate questions that would be appropriate for a midterm or final exam in this subject area.
         """
         
         # Use direct function to generate exam questions
@@ -765,8 +749,7 @@ async def generate_sample_exam(request: Request, notebook_id: str):
             raise HTTPException(status_code=500, detail="Failed to generate exam questions")
         
         # Cache the generated exam
-        cache_success = await cache_study_feature(notebook_id, "exam", exam_content)
-        logger.info(f"Cache result for exam: {cache_success}")
+        await cache_study_feature(notebook_id, "exam", exam_content)
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -775,7 +758,6 @@ async def generate_sample_exam(request: Request, notebook_id: str):
         )
         
     except Exception as e:
-        logger.error(f"Exam generation error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -790,13 +772,11 @@ async def generate_flashcards(request: Request, notebook_id: str):
         # Check if flashcards are already cached
         cached_flashcards = await get_cached_study_feature(notebook_id, "flashcards")
         if cached_flashcards:
-            logger.info(f"Returning cached flashcards for notebook {notebook_id}")
             return StudyFeatureResponse(
                 id=str(uuid.uuid4()),
                 content=cached_flashcards,
                 created=datetime.now().isoformat()
             )
-        logger.info(f"No cached flashcards found for notebook {notebook_id}, generating new one")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -835,8 +815,7 @@ async def generate_flashcards(request: Request, notebook_id: str):
             raise HTTPException(status_code=500, detail="Failed to generate flashcards")
         
         # Cache the generated flashcards
-        cache_success = await cache_study_feature(notebook_id, "flashcards", flashcard_content)
-        logger.info(f"Cache result for flashcards: {cache_success}")
+        await cache_study_feature(notebook_id, "flashcards", flashcard_content)
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
@@ -845,7 +824,6 @@ async def generate_flashcards(request: Request, notebook_id: str):
         )
         
     except Exception as e:
-        logger.error(f"Flashcard generation error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 
@@ -879,7 +857,6 @@ async def clear_study_features_cache(notebook_id: str, feature_type: Optional[st
                 raise HTTPException(status_code=500, detail="Failed to clear some or all cached features")
                 
     except Exception as e:
-        logger.error(f"Cache clearing error: {str(e)}")
         sanitized_error = sanitize_error_message(e)
         raise HTTPException(status_code=500, detail=sanitized_error)
 

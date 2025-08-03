@@ -51,9 +51,8 @@ class PineconeService:
                     region="us-east-1"
                 )
             )
-            print(f"Created Pinecone index: {self.index_name}")
         else:
-            print(f"Using existing Pinecone index: {self.index_name}")
+            pass
         
         return self.index_name
     
@@ -105,7 +104,6 @@ class PineconeService:
             return True
             
         except Exception as e:
-            print(f"Error adding documents to notebook {notebook_id}: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -160,7 +158,6 @@ class PineconeService:
             return response.choices[0].message.content
             
         except Exception as e:
-            print(f"Error querying notebook {notebook_id}: {e}")
             return None
     
     async def delete_notebook_documents(self, notebook_id: str) -> bool:
@@ -173,15 +170,12 @@ class PineconeService:
             # Delete all vectors with the specific notebook_id
             index.delete(filter={"notebook_id": {"$eq": notebook_id}})
             
-            print(f"Deleted all documents for notebook {notebook_id}")
-            
             # Remove from database
             await self._remove_document_reference(notebook_id)
             
             return True
             
         except Exception as e:
-            print(f"Error deleting notebook documents {notebook_id}: {e}")
             return False
     
     async def _store_document_reference(self, notebook_id: str, metadata: Optional[Dict] = None):
@@ -195,18 +189,17 @@ class PineconeService:
             }
             
             # Store in Supabase (you can create a table for this)
-            # For now, we'll just print it
-            print(f"Stored document reference: {data}")
+            # For now, we'll just pass
             
         except Exception as e:
-            print(f"Error storing document reference: {e}")
+            pass
     
     async def _remove_document_reference(self, notebook_id: str):
         """Remove document reference from database."""
         try:
-            print(f"Removed document reference for notebook: {notebook_id}")
+            pass
         except Exception as e:
-            print(f"Error removing document reference: {e}")
+            pass
     
     def list_notebooks(self) -> List[str]:
         """List all notebooks that have documents in the index."""
@@ -224,7 +217,6 @@ class PineconeService:
                 return []
                 
         except Exception as e:
-            print(f"Error listing notebooks: {e}")
             return []
 
 # Global instance

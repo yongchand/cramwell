@@ -44,7 +44,6 @@ def format_response_with_template(raw_response: str, question: str) -> str:
         return formatted_response
         
     except Exception as e:
-        print(f"Error formatting response with template: {e}")
         # Fallback to simple formatting
         return f"**Answer:**\n\n{raw_response}\n\n---\n\n*This response is based on your uploaded documents.*"
 
@@ -101,7 +100,6 @@ try:
     DOC_CONVERTER = converter
 except Exception as e:
     DOC_CONVERTER = None
-    print(f"Warning: Could not initialize DocumentConverter at startup: {e}")
 
 
 async def parse_file_pymupdf(
@@ -137,7 +135,6 @@ async def parse_file_pymupdf(
         return text, images, tables
         
     except Exception as e:
-        print(f"Error parsing file with PyMuPDF {file_path}: {e}")
         import traceback
         traceback.print_exc()
         return None, None, None
@@ -189,7 +186,6 @@ async def parse_file_docling(
             images = []
         return text, images, tables
     except Exception as e:
-        print(f"Error parsing file with Docling {file_path}: {e}")
         import traceback
         traceback.print_exc()
         return None, None, None
@@ -234,34 +230,27 @@ async def parse_file(
     """
     Smart hybrid parsing: Use PyMuPDF as default, fallback to Docling for handwritten notes.
     """
-    print(f"Starting smart parsing for: {file_path}")
     
     # Try PyMuPDF first (fast and lightweight)
-    print("Trying PyMuPDF extraction...")
     text, images, tables = await parse_file_pymupdf(file_path, with_images, with_tables)
     
     if text and len(text.strip()) > 50:
         # Check if extraction quality is good
         if not is_handwritten_or_poor_extraction(text):
-            print("PyMuPDF extraction successful - using lightweight method")
             return text, images, tables
         else:
-            print("PyMuPDF detected poor extraction quality")
+            pass
     else:
-        print("PyMuPDF extracted little or no text")
+        pass
     
     # Fallback to Docling for better extraction
-    print("🔄 Falling back to Docling for better extraction...")
     try:
         text, images, tables = await parse_file_docling(file_path, with_images, with_tables)
         if text and len(text.strip()) > 50:
-            print("✅ Docling extraction successful")
             return text, images, tables
         else:
-            print("❌ Both PyMuPDF and Docling failed to extract meaningful text")
             return None, None, None
     except Exception as e:
-        print(f"❌ Docling fallback failed: {e}")
         return None, None, None
 
 
@@ -284,8 +273,6 @@ async def process_file(
             file_path = path
             break
     else:
-        print(f"File not found: {filename}")
-        print(f"Tried paths: {possible_paths}")
         return None, None
     
     text, _, _ = await parse_file(file_path=file_path)
@@ -340,7 +327,6 @@ async def process_file_for_notebook(
         # Parse the file to get text content using Docling
         text, _, _ = await parse_file(file_path=file_path)
         if text is None:
-            print(f"Could not parse file: {file_path}")
             return None, None
         
         # Process text in chunks to reduce memory usage
@@ -388,7 +374,6 @@ async def process_file_for_notebook(
         return None, None
         
     except Exception as e:
-        print(f"Error processing file for notebook: {e}")
         import traceback
         traceback.print_exc()
         return None, None
@@ -423,32 +408,21 @@ async def query_index_for_notebook(question: str, notebook_id: str) -> Union[str
     This function queries only documents from the specified notebook.
     """
     try:
-        print(f"Querying notebook {notebook_id} with question: {question[:100]}...")
-        
         # Query the notebook-specific Pinecone index
         raw_response = await pinecone_service.query_notebook(notebook_id, question)
         
-        print(f"Raw response type: {type(raw_response)}")
-        print(f"Raw response: {raw_response[:200] if raw_response else 'None'}")
-        
         if not raw_response:
-            print("No raw response received")
             return None
         
         # Format the response using template
         try:
             formatted_response = format_response_with_template(raw_response, question)
-            print(f"Formatted response type: {type(formatted_response)}")
-            print(f"Formatted response: {formatted_response[:200] if formatted_response else 'None'}")
             return formatted_response
         except Exception as e:
-            print(f"Error formatting response with template: {e}")
             # Fallback to raw response
-            print(f"Using raw response as fallback")
             return raw_response
         
     except Exception as e:
-        print(f"Error in query_index_for_notebook: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -470,8 +444,6 @@ async def get_plots_and_tables(
             resolved_path = path
             break
     else:
-        print(f"File not found: {file_path}")
-        print(f"Tried paths: {possible_paths}")
         return None, None
     
     _, images, tables = await parse_file(
@@ -511,16 +483,12 @@ async def get_cached_study_feature(notebook_id: str, feature_type: str) -> Optio
         The cached content if found, None otherwise
     """
     try:
-        print(f"Checking cache for {feature_type} in notebook {notebook_id}")
         result = supabase.table("study_features_cache").select("content").eq("notebook_id", notebook_id).eq("feature_type", feature_type).execute()
         
         if result.data and len(result.data) > 0:
-            print(f"Found cached {feature_type} for notebook {notebook_id}")
             return result.data[0]["content"]
-        print(f"No cached {feature_type} found for notebook {notebook_id}")
         return None
     except Exception as e:
-        print(f"Error retrieving cached {feature_type} for notebook {notebook_id}: {e}")
         return None
 
 
@@ -537,7 +505,6 @@ async def cache_study_feature(notebook_id: str, feature_type: str, content: str)
         True if successful, False otherwise
     """
     try:
-        print(f"Caching {feature_type} for notebook {notebook_id}")
         # Use upsert to handle both insert and update cases
         result = supabase.table("study_features_cache").upsert({
             "notebook_id": notebook_id,
@@ -545,10 +512,8 @@ async def cache_study_feature(notebook_id: str, feature_type: str, content: str)
             "content": content
         }).execute()
         
-        print(f"Successfully cached {feature_type} for notebook {notebook_id}")
         return True
     except Exception as e:
-        print(f"Error caching {feature_type} for notebook {notebook_id}: {e}")
         return False
 
 
@@ -567,5 +532,4 @@ async def clear_cached_study_feature(notebook_id: str, feature_type: str) -> boo
         result = supabase.table("study_features_cache").delete().eq("notebook_id", notebook_id).eq("feature_type", feature_type).execute()
         return True
     except Exception as e:
-        print(f"Error clearing cached {feature_type} for notebook {notebook_id}: {e}")
         return False

@@ -265,7 +265,6 @@ export default function NotebookPage() {
         }
       } else if (response.status === 404) {
         // No summary exists yet, that's okay
-        console.log('No existing summary found')
       }
     } catch (error) {
       console.error('Error loading summary:', error)
@@ -467,13 +466,11 @@ export default function NotebookPage() {
     }
 
     try {
-      console.log('handleFileUpload: Starting upload process');
       setIsUploading(true);
       const supabase = createClient();
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
       if (!userId) throw new Error("User not authenticated");
-      console.log('handleFileUpload: User authenticated, userId:', userId);
 
       const uploadedFiles = [];
       const duplicateFiles = [];
@@ -485,7 +482,6 @@ export default function NotebookPage() {
         
         // For general_review, skip file upload and only save metadata
         if (kind === 'general_review') {
-          console.log('handleFileUpload: General review - skipping file upload, saving metadata only');
           
           // Create a placeholder document record for general review
           const documentDataToInsert: any = {
@@ -534,8 +530,6 @@ export default function NotebookPage() {
             
             if (reviewError) {
               console.warn(`Failed to save review metadata: ${reviewError.message}`);
-            } else {
-              console.log(`Successfully saved review metadata`);
             }
           }
 
@@ -609,7 +603,6 @@ export default function NotebookPage() {
 
       // Process uploaded files through the backend API to add them to Pinecone
       if (uploadedFiles.length > 0 && kind !== 'general_review') {
-        console.log('handleFileUpload: Processing files through backend API');
         
         for (const fileName of uploadedFiles) {
           try {
@@ -624,7 +617,7 @@ export default function NotebookPage() {
             const formData = new FormData();
             formData.append('file', file);
 
-            console.log(`Processing file: ${fileName} for notebook: ${notebookId}`);
+
             
             // Call the backend API to process the file and add to Pinecone
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/upload/?document_type=${kind}`, {
@@ -639,7 +632,6 @@ export default function NotebookPage() {
             }
 
             const result = await response.json();
-            console.log(`Successfully processed file ${fileName}:`, result);
             
           } catch (error) {
             console.error(`Error processing file ${fileName}:`, error);
@@ -655,7 +647,6 @@ export default function NotebookPage() {
 
       // Handle case where no files are provided for general_review
       if (kind === 'general_review' && files.length === 0 && metadata) {
-        console.log('handleFileUpload: General review with no files - saving metadata only');
         
         // Create a placeholder document record for general review
         const documentDataToInsert: any = {
@@ -703,8 +694,6 @@ export default function NotebookPage() {
         
         if (reviewError) {
           console.warn(`Failed to save review metadata: ${reviewError.message}`);
-        } else {
-          console.log(`Successfully saved review metadata`);
         }
 
         uploadedFiles.push(`Review_${new Date().toISOString().split('T')[0]}`);
@@ -728,10 +717,8 @@ export default function NotebookPage() {
 
       // Reload sources to show new documents
       if (uploadedFiles.length > 0) {
-        console.log('handleFileUpload: Reloading sources');
         await loadSources();
       }
-      console.log('handleFileUpload: Upload process completed successfully');
     } catch (error: any) {
       console.error('Failed to upload files:', error);
       toast({
@@ -740,7 +727,6 @@ export default function NotebookPage() {
         variant: "destructive",
       });
     } finally {
-      console.log('handleFileUpload: Setting isUploading to false');
       setIsUploading(false);
     }
   };
@@ -931,9 +917,6 @@ export default function NotebookPage() {
 
     try {
       setIsGenerating(true)
-      console.log(`Generating ${featureType} for notebook ${notebookId}`)
-      console.log(`Notebook ID from params: ${notebookId}`)
-      console.log(`Available sources: ${sources.length}`)
       
       // Map feature types to correct endpoint names
       const endpointMap = {
@@ -943,22 +926,11 @@ export default function NotebookPage() {
       }
       const endpointName = endpointMap[featureType]
       const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/generate-${endpointName}/`
-      console.log(`Making request to: ${url}`)
-      console.log(`Request method: POST`)
-      console.log(`Request headers:`, { 'Content-Type': 'application/json' })
       
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
-      
-      console.log(`Response received:`, response)
-      console.log(`Response URL:`, response.url)
-      console.log(`Response status: ${response.status}`)
-      console.log(`Response status text: ${response.statusText}`)
-
-      console.log(`Response status: ${response.status}`)
-      console.log(`Response headers:`, response.headers)
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -967,22 +939,15 @@ export default function NotebookPage() {
       }
 
       const data = await response.json()
-      console.log(`Generated ${featureType}:`, data)
       
       // Debug flashcard parsing
       if (featureType === 'flashcards') {
-        console.log(`Flashcard content:`, data.content)
         const parsedFlashcards = parseFlashcards(data.content)
-        console.log(`Parsed flashcards:`, parsedFlashcards)
-        console.log(`Number of flashcards found:`, parsedFlashcards.length)
       }
       
       // Parse exam questions if generating exam
       if (featureType === 'exam') {
-        console.log(`Exam content:`, data.content)
         const parsedQuestions = parseExamQuestions(data.content)
-        console.log(`Parsed questions:`, parsedQuestions)
-        console.log(`Number of questions found:`, parsedQuestions.length)
         setExamQuestions(parsedQuestions)
         setSelectedAnswers({})
         setShowAnswers(false)
