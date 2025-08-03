@@ -1503,7 +1503,11 @@ export default function NotebookPage() {
                             <h4 className="text-lg font-semibold">
                               Question {index + 1}
                             </h4>
-                            <p className="text-base">{question.question}</p>
+                            <div className="text-base prose prose-sm max-w-none">
+                              <ReactMarkdown>
+                                {question.question}
+                              </ReactMarkdown>
+                            </div>
                             
                             <div className="space-y-2">
                               {question.options.map((option, optionIndex) => (
@@ -1540,7 +1544,11 @@ export default function NotebookPage() {
                                     }`}>
                                       {String.fromCharCode(65 + optionIndex)}
                                     </div>
-                                    <span className="flex-1">{option}</span>
+                                    <span className="flex-1 prose prose-sm max-w-none">
+                                      <ReactMarkdown>
+                                        {option}
+                                      </ReactMarkdown>
+                                    </span>
                                     {showAnswers && optionIndex === question.correctAnswer && (
                                       <Check className="h-5 w-5 text-green-600" />
                                     )}
@@ -1551,9 +1559,11 @@ export default function NotebookPage() {
                             
                             {showAnswers && question.explanation && (
                               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                                <p className="text-sm text-blue-800">
-                                  <strong>Explanation:</strong> {question.explanation}
-                                </p>
+                                <div className="text-sm text-blue-800 prose prose-sm max-w-none">
+                                  <ReactMarkdown>
+                                    {`**Explanation:** ${question.explanation}`}
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1663,8 +1673,10 @@ export default function NotebookPage() {
                               } transition-opacity duration-300`}
                               style={{ backfaceVisibility: 'hidden' }}
                             >
-                              <div className="text-lg font-medium text-black">
-                                {currentCard.front}
+                              <div className="text-lg font-medium text-black prose prose-sm max-w-none">
+                                <ReactMarkdown>
+                                  {currentCard.front}
+                                </ReactMarkdown>
                               </div>
                               <div className="text-sm text-gray-600 mt-2">
                                 Question - Click to flip
@@ -1681,8 +1693,10 @@ export default function NotebookPage() {
                                 transform: 'rotateY(180deg)'
                               }}
                             >
-                              <div className="text-lg font-medium text-black">
-                                {currentCard.back}
+                              <div className="text-lg font-medium text-black prose prose-sm max-w-none">
+                                <ReactMarkdown>
+                                  {currentCard.back}
+                                </ReactMarkdown>
                               </div>
                               <div className="text-sm text-gray-600 mt-2">
                                 Answer - Click to flip
