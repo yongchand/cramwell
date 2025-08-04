@@ -404,14 +404,14 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
 @limiter.limit("30/5 minutes")
-async def send_chat_message(http_request: Request, notebook_id: str, request: ChatMessageRequest):
+async def send_chat_message(request: Request, notebook_id: str, chat_request: ChatMessageRequest):
     """Send a chat message for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
         # Query using notebook-specific context directly
-        response_text = await query_index_for_notebook(request.message, notebook_id)
+        response_text = await query_index_for_notebook(chat_request.message, notebook_id)
         
         if not response_text:
             response_text = "Sorry, I was unable to find an answer to your question."
@@ -420,7 +420,7 @@ async def send_chat_message(http_request: Request, notebook_id: str, request: Ch
         now = datetime.now().isoformat()
         
         # Use the user_id from the request
-        user_id = request.user_id
+        user_id = chat_request.user_id
         
         # Try to get an existing active session for this notebook and user
         session_res = supabase.table("chat_sessions").select("*").eq("notebook_id", notebook_id).eq("user_id", user_id).eq("active", True).order("created_at", desc=True).limit(1).execute()
@@ -445,7 +445,7 @@ async def send_chat_message(http_request: Request, notebook_id: str, request: Ch
             "session_id": session_id,
             "user_id": user_id,  # Set the user_id for user messages
             "role": "user",
-            "content": request.message,
+            "content": chat_request.message,
             "created_at": now
         }
         
