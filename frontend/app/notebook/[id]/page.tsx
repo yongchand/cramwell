@@ -1138,7 +1138,7 @@ export default function NotebookPage() {
     <>
       <header className="flex items-center justify-between px-8 py-6 border-b border-muted bg-uchicago-crimson">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="mr-2 text-white hover:bg-uchicago-maroon">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')} className="mr-2 text-white hover:bg-uchicago-maroon">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold truncate max-w-xs md:max-w-md lg:max-w-2xl text-white">{notebook.name}</h1>
