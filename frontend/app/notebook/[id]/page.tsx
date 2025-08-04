@@ -1344,7 +1344,7 @@ export default function NotebookPage() {
             {sessionLoading ? (
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 {/* Loading Animation */}
-                <div className="relative">
+                <div className="relative flex justify-center">
                   {/* Central Circle */}
                   <div className="w-24 h-24 bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon rounded-full flex items-center justify-center shadow-lg animate-pulse">
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
