@@ -1084,7 +1084,7 @@ export default function NotebookPage() {
       <div className="min-h-screen bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon flex items-center justify-center">
         <div className="text-center space-y-8">
           {/* Main Loading Animation */}
-          <div className="relative">
+          <div className="relative flex justify-center">
             {/* Central Circle */}
             <div className="w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl animate-pulse">
               <div className="w-24 h-24 bg-gradient-to-br from-white to-white/80 rounded-full flex items-center justify-center shadow-lg">
