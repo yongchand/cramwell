@@ -269,7 +269,7 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
             <>
               <p className="mb-2 text-muted-foreground">Drag & drop files here, or click to select</p>
               <p className="text-xs text-muted-foreground mb-2">
-                Supported: PDF, DOC, DOCX, PPT, PPTX (max 25MB each)
+                Supported: PDF, DOC, DOCX, PPT, PPTX, XLSX, CSV, IPYNB (max 25MB each)
               </p>
             </>
           )}
@@ -279,7 +279,7 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
             multiple
             className="hidden"
             onChange={handleFileInput}
-            accept=".pdf,.doc,.docx,.ppt,.pptx"
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.csv,.ipynb"
           />
         </div>
         

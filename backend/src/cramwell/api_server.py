@@ -337,7 +337,7 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
         raise HTTPException(status_code=403, detail="Access denied to this notebook")
     
     # Validate file type
-    allowed_types = [".pdf", ".docx", ".txt", ".md", ".html"]
+    allowed_types = [".pdf", ".docx", ".txt", ".md", ".html", ".ppt", ".pptx", ".ipynb", ".xlsx", ".csv"]
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in allowed_types:
         raise HTTPException(status_code=400, detail=f"File type {file_ext} not supported. Allowed types: {allowed_types}")

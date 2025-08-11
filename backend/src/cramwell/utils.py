@@ -122,15 +122,32 @@ async def parse_file_pymupdf(
         for page in doc:
             text += page.get_text()
         
+        # Extract images if requested
+        if with_images:
+            import base64
+            images = []
+            for page_num, page in enumerate(doc):
+                image_list = page.get_images()
+                for img_index, img in enumerate(image_list):
+                    try:
+                        xref = img[0]
+                        pix = fitz.Pixmap(doc, xref)
+                        
+                        # Convert to base64
+                        img_data = pix.tobytes("png")
+                        img_base64 = base64.b64encode(img_data).decode('utf-8')
+                        images.append(f"data:image/png;base64,{img_base64}")
+                        
+                        pix = None  # Free memory
+                    except Exception as e:
+                        # Skip images that can't be extracted
+                        pass
+        
         doc.close()
         
         # Extract tables if requested (simplified)
         if with_tables:
             tables = []
-        
-        # Extract images if requested (simplified)
-        if with_images:
-            images = []
         
         return text, images, tables
         
@@ -224,34 +241,258 @@ def is_handwritten_or_poor_extraction(text: str) -> bool:
     return False
 
 
+async def parse_spreadsheet_file(
+    file_path: str, with_tables: bool = False
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse Excel (.xlsx) and CSV files.
+    """
+    text: Optional[str] = None
+    tables: Optional[List[pd.DataFrame]] = []
+    images: Optional[List[str]] = None
+    
+    try:
+        import pandas as pd
+        
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        if file_ext == '.xlsx':
+            # Read Excel file - get all sheets
+            excel_file = pd.ExcelFile(file_path)
+            sheet_names = excel_file.sheet_names
+            
+            text_parts = []
+            for sheet_name in sheet_names:
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                text_parts.append(f"Sheet: {sheet_name}\n")
+                text_parts.append(df.to_string(index=False))
+                text_parts.append("\n\n")
+                
+                if with_tables:
+                    tables.append(df)
+            
+            text = "".join(text_parts)
+            
+        elif file_ext == '.csv':
+            # Read CSV file
+            df = pd.read_csv(file_path)
+            text = f"CSV Data:\n{df.to_string(index=False)}"
+            
+            if with_tables:
+                tables.append(df)
+        
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        # Force garbage collection
+        import gc
+        gc.collect()
+
+
+async def parse_jupyter_notebook(
+    file_path: str
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse Jupyter notebook (.ipynb) files.
+    """
+    text: Optional[str] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    images: Optional[List[str]] = None
+    
+    try:
+        import json
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            notebook_data = json.load(f)
+        
+        text_parts = []
+        
+        for cell in notebook_data.get('cells', []):
+            cell_type = cell.get('cell_type', '')
+            source = ''.join(cell.get('source', []))
+            
+            if cell_type == 'markdown':
+                text_parts.append(f"# Markdown Cell\n{source}\n\n")
+            elif cell_type == 'code':
+                text_parts.append(f"# Code Cell\n```python\n{source}\n```\n\n")
+                
+                # Add output if available
+                outputs = cell.get('outputs', [])
+                for output in outputs:
+                    if output.get('output_type') == 'execute_result':
+                        data = output.get('data', {})
+                        if 'text/plain' in data:
+                            text_parts.append(f"Output: {data['text/plain']}\n\n")
+        
+        text = "".join(text_parts)
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        # Force garbage collection
+        import gc
+        gc.collect()
+
+
+async def parse_powerpoint_file(
+    file_path: str
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse PowerPoint (.ppt, .pptx) files.
+    """
+    text: Optional[str] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    images: Optional[List[str]] = None
+    
+    try:
+        from pptx import Presentation
+        import base64
+        
+        prs = Presentation(file_path)
+        text_parts = []
+        images = []
+        
+        for slide_num, slide in enumerate(prs.slides, 1):
+            text_parts.append(f"Slide {slide_num}:\n")
+            
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    text_parts.append(f"{shape.text}\n")
+                
+                # Extract images from shapes
+                if hasattr(shape, "image"):
+                    try:
+                        image = shape.image
+                        # Convert image to base64 for storage
+                        image_bytes = image.blob
+                        image_ext = image.ext
+                        image_data = base64.b64encode(image_bytes).decode('utf-8')
+                        images.append(f"data:image/{image_ext};base64,{image_data}")
+                    except Exception as e:
+                        # Skip images that can't be extracted
+                        pass
+            
+            text_parts.append("\n")
+        
+        text = "".join(text_parts)
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        # Force garbage collection
+        import gc
+        gc.collect()
+
+
+async def parse_docx_file(
+    file_path: str
+) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse Word (.docx) files using python-docx.
+    """
+    text: Optional[str] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    images: Optional[List[str]] = None
+    
+    try:
+        from docx import Document
+        
+        doc = Document(file_path)
+        text_parts = []
+        
+        # Extract text from paragraphs
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                text_parts.append(paragraph.text.strip() + "\n")
+        
+        # Extract text from tables
+        for table in doc.tables:
+            text_parts.append("\n--- Table ---\n")
+            for row in table.rows:
+                row_text = []
+                for cell in row.cells:
+                    row_text.append(cell.text.strip())
+                text_parts.append(" | ".join(row_text) + "\n")
+            text_parts.append("--- End Table ---\n\n")
+        
+        # Extract text from headers and footers
+        for section in doc.sections:
+            header = section.header
+            for paragraph in header.paragraphs:
+                if paragraph.text.strip():
+                    text_parts.append(f"Header: {paragraph.text.strip()}\n")
+            
+            footer = section.footer
+            for paragraph in footer.paragraphs:
+                if paragraph.text.strip():
+                    text_parts.append(f"Footer: {paragraph.text.strip()}\n")
+        
+        text = "".join(text_parts)
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        # Force garbage collection
+        import gc
+        gc.collect()
+
+
 async def parse_file(
     file_path: str, with_images: bool = False, with_tables: bool = False
 ) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
     """
-    Smart hybrid parsing: Use PyMuPDF as default, fallback to Docling for handwritten notes.
+    Smart hybrid parsing: Use specialized parsers for different file types.
     """
     
-    # Try PyMuPDF first (fast and lightweight)
-    text, images, tables = await parse_file_pymupdf(file_path, with_images, with_tables)
+    file_ext = os.path.splitext(file_path)[1].lower()
     
-    if text and len(text.strip()) > 50:
-        # Check if extraction quality is good
-        if not is_handwritten_or_poor_extraction(text):
-            return text, images, tables
+    # Handle different file types with specialized parsers
+    if file_ext in ['.xlsx', '.csv']:
+        return await parse_spreadsheet_file(file_path, with_tables)
+    elif file_ext == '.ipynb':
+        return await parse_jupyter_notebook(file_path)
+    elif file_ext in ['.ppt', '.pptx']:
+        # Enable image extraction for PowerPoint files
+        return await parse_powerpoint_file(file_path)
+    elif file_ext == '.docx':
+        # Use specialized DOCX parser
+        return await parse_docx_file(file_path)
+    else:
+        # Use existing parsers for document files
+        # Try PyMuPDF first (fast and lightweight) - enable images by default for PDFs
+        text, images, tables = await parse_file_pymupdf(file_path, with_images=True, with_tables=with_tables)
+        
+        if text and len(text.strip()) > 50:
+            # Check if extraction quality is good
+            if not is_handwritten_or_poor_extraction(text):
+                return text, images, tables
+            else:
+                pass
         else:
             pass
-    else:
-        pass
-    
-    # Fallback to Docling for better extraction
-    try:
-        text, images, tables = await parse_file_docling(file_path, with_images, with_tables)
-        if text and len(text.strip()) > 50:
-            return text, images, tables
-        else:
+        
+        # Fallback to Docling for better extraction
+        try:
+            text, images, tables = await parse_file_docling(file_path, with_images=True, with_tables=with_tables)
+            if text and len(text.strip()) > 50:
+                return text, images, tables
+            else:
+                return None, None, None
+        except Exception as e:
             return None, None, None
-    except Exception as e:
-        return None, None, None
 
 
 async def process_file(
@@ -329,13 +570,8 @@ async def process_file_for_notebook(
         if text is None:
             return None, None
         
-        # Process text in chunks to reduce memory usage
-        chunk_size = 10000  # Process 10KB chunks
-        text_chunks = []
-        
-        for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
-            text_chunks.append(chunk)
+        # Process text in token-aware chunks to prevent OpenAI errors
+        text_chunks = smart_chunk_text(text, max_tokens=6000)
         
         # Create document dict for Pinecone with chunked content
         documents = []
@@ -533,3 +769,145 @@ async def clear_cached_study_feature(notebook_id: str, feature_type: str) -> boo
         return True
     except Exception as e:
         return False
+
+
+def smart_chunk_text(text: str, max_tokens: int = 6000, overlap_tokens: int = 200) -> List[str]:
+    """
+    Split text into chunks that respect token limits for OpenAI embeddings.
+    Uses tiktoken for accurate token counting with overlapping content for context continuity.
+    
+    Args:
+        text: Text to chunk
+        max_tokens: Maximum tokens per chunk
+        overlap_tokens: Number of tokens to overlap between chunks for context
+    """
+    try:
+        import tiktoken
+        
+        # Use the same encoding as text-embedding-3-small
+        encoding = tiktoken.encoding_for_model("text-embedding-3-small")
+        
+        # If text is small enough, return as single chunk
+        tokens = encoding.encode(text)
+        if len(tokens) <= max_tokens:
+            return [text]
+        
+        # Split into sentences for better chunking
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        chunks = []
+        current_chunk_sentences = []
+        current_tokens = 0
+        
+        # Build chunks sentence by sentence
+        for sentence in sentences:
+            sentence_tokens = len(encoding.encode(sentence))
+            
+            # If adding this sentence would exceed the limit, finalize current chunk
+            if current_tokens + sentence_tokens > max_tokens and current_chunk_sentences:
+                chunk_text = " ".join(current_chunk_sentences)
+                chunks.append(chunk_text)
+                
+                # Create overlap for next chunk
+                overlap_sentences = []
+                overlap_token_count = 0
+                
+                # Take sentences from the end of current chunk for overlap
+                for i in range(len(current_chunk_sentences) - 1, -1, -1):
+                    overlap_sentence = current_chunk_sentences[i]
+                    overlap_sentence_tokens = len(encoding.encode(overlap_sentence))
+                    
+                    if overlap_token_count + overlap_sentence_tokens <= overlap_tokens:
+                        overlap_sentences.insert(0, overlap_sentence)
+                        overlap_token_count += overlap_sentence_tokens
+                    else:
+                        break
+                
+                # Start new chunk with overlap + current sentence
+                current_chunk_sentences = overlap_sentences + [sentence]
+                current_tokens = overlap_token_count + sentence_tokens
+            else:
+                current_chunk_sentences.append(sentence)
+                current_tokens += sentence_tokens
+        
+        # Add the last chunk if it has content
+        if current_chunk_sentences:
+            chunk_text = " ".join(current_chunk_sentences)
+            chunks.append(chunk_text)
+        
+        # Handle edge case where a single sentence is too long
+        final_chunks = []
+        for chunk in chunks:
+            chunk_tokens = len(encoding.encode(chunk))
+            if chunk_tokens <= max_tokens:
+                final_chunks.append(chunk)
+            else:
+                # Split by words if sentence is too long
+                words = chunk.split()
+                temp_chunk_words = []
+                temp_tokens = 0
+                
+                for word in words:
+                    word_tokens = len(encoding.encode(word + " "))
+                    if temp_tokens + word_tokens > max_tokens and temp_chunk_words:
+                        # Create word-based chunk
+                        word_chunk = " ".join(temp_chunk_words)
+                        final_chunks.append(word_chunk)
+                        
+                        # Create overlap for next word chunk
+                        overlap_words = temp_chunk_words[-50:] if len(temp_chunk_words) > 50 else temp_chunk_words[-len(temp_chunk_words)//2:]
+                        overlap_word_tokens = len(encoding.encode(" ".join(overlap_words)))
+                        
+                        if overlap_word_tokens <= overlap_tokens:
+                            temp_chunk_words = overlap_words + [word]
+                            temp_tokens = overlap_word_tokens + word_tokens
+                        else:
+                            temp_chunk_words = [word]
+                            temp_tokens = word_tokens
+                    else:
+                        temp_chunk_words.append(word)
+                        temp_tokens += word_tokens
+                
+                if temp_chunk_words:
+                    final_chunks.append(" ".join(temp_chunk_words))
+        
+        return final_chunks if final_chunks else [text[:max_tokens*3]]
+        
+    except ImportError:
+        # Fallback to character-based chunking with overlap if tiktoken is not available
+        chunk_size = max_tokens * 3  # Rough estimate: 1 token ≈ 3-4 characters
+        overlap_size = overlap_tokens * 3
+        chunks = []
+        
+        start = 0
+        while start < len(text):
+            end = start + chunk_size
+            chunk = text[start:end]
+            chunks.append(chunk)
+            
+            # Move start forward but with overlap
+            start = end - overlap_size if end - overlap_size > start else end
+            
+            if start >= len(text):
+                break
+                
+        return chunks
+    except Exception as e:
+        # Fallback to simple character chunking with overlap on any error
+        chunk_size = max_tokens * 3
+        overlap_size = overlap_tokens * 3
+        chunks = []
+        
+        start = 0
+        while start < len(text):
+            end = start + chunk_size
+            chunk = text[start:end]
+            chunks.append(chunk)
+            
+            # Move start forward but with overlap
+            start = end - overlap_size if end - overlap_size > start else end
+            
+            if start >= len(text):
+                break
+                
+        return chunks

@@ -427,7 +427,7 @@ export default function NotebookPage() {
     if (!files || files.length === 0) return;
 
     const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB limit
-    const ALLOWED_TYPES = /\.(pdf|doc|docx|pptx|ppt)$/i;
+    const ALLOWED_TYPES = /\.(pdf|doc|docx|pptx|ppt|xlsx|csv|ipynb)$/i;
 
     const formatFileSize = (bytes: number) => {
       if (bytes === 0) return '0 Bytes';
@@ -451,7 +451,7 @@ export default function NotebookPage() {
     if (invalidTypeFiles.length > 0) {
       toast({
         title: "Invalid file type",
-        description: `Please upload only PDF, DOC, DOCX, PPT, or PPTX files. Invalid files: ${invalidTypeFiles.map(f => f.name).join(', ')}`,
+                      description: `Please upload only PDF, DOC, DOCX, PPT, PPTX, XLSX, CSV, or IPYNB files. Invalid files: ${invalidTypeFiles.map(f => f.name).join(', ')}`,
         variant: "destructive",
       });
       return;
