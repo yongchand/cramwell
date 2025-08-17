@@ -561,18 +561,36 @@ async def get_summary(notebook_id: str):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
+        # Clear any existing cached summary to ensure fresh generation with assessment extraction
+        await clear_cached_study_feature(notebook_id, "summary")
+        
         # Get summary from summary table
         summary_res = supabase.table("summary").select("*").eq("notebook_id", notebook_id).execute()
         existing_summary = summary_res.data[0] if summary_res.data else None
         
-        # Create a brief summary using MCP server
+        # Create a brief summary using direct pinecone query (avoid template formatting)
         summary_prompt = f"""
         Based on the uploaded documents for this notebook, create a brief 2-3 sentence summary of the syllabus content.
         Focus on the main topics and key concepts covered in the course materials.
         """
         
-        # Use direct function to generate summary
-        summary_content = await query_index_for_notebook(summary_prompt, notebook_id)
+        # Extract assessment information from syllabus
+        assessment_prompt = f"""
+        Please examine the syllabus and course documents to find information about these specific assessments. 
+        
+        Respond in exactly this format:
+        
+        **Midterm:** [If midterms exist, state "Yes" and include count if specified (e.g. "Yes (2 exams)"). If no midterms mentioned, state "Not specified"]
+        **Final:** [If final exam exists, state "Yes" and include any details about timing/format. If no final mentioned, state "Not specified"]  
+        **Weekly Quiz:** [If weekly/regular quizzes exist, state "Yes" and include frequency/details. If no weekly quizzes mentioned, state "Not specified"]
+        
+        Only include information that is explicitly mentioned in the uploaded documents. Do not make assumptions.
+        """
+        
+        # Use direct pinecone service to avoid template formatting
+        from .pinecone_service import pinecone_service
+        summary_content = await pinecone_service.query_notebook(notebook_id, summary_prompt)
+        assessment_content = await pinecone_service.query_notebook(notebook_id, assessment_prompt)
         
         if not summary_content:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
@@ -606,6 +624,9 @@ async def get_summary(notebook_id: str):
 ## Syllabus Overview
 {summary_content}
 
+## Assessment Structure
+{assessment_content if assessment_content else "*Assessment details not found in syllabus.*"}
+
 ## Course Statistics
 - **Average GPA**: {updated_summary.get('average_gpa', 'N/A')}
 - **Average Hours**: {updated_summary.get('average_hours', 'N/A')}
@@ -618,6 +639,9 @@ async def get_summary(notebook_id: str):
 
 ## Syllabus Overview
 {summary_content}
+
+## Assessment Structure
+{assessment_content if assessment_content else "*Assessment details not found in syllabus.*"}
 
 ## Course Statistics
 *No course statistics available yet.*
@@ -641,14 +665,8 @@ async def generate_summary(request: Request, notebook_id: str):
         raise HTTPException(status_code=404, detail="Notebook not found")
     
     try:
-        # Check if summary is already cached
-        cached_summary = await get_cached_study_feature(notebook_id, "summary")
-        if cached_summary:
-            return StudyFeatureResponse(
-                id=str(uuid.uuid4()),
-                content=cached_summary,
-                created=datetime.now().isoformat()
-            )
+        # Clear any existing cached summary to ensure fresh generation
+        await clear_cached_study_feature(notebook_id, "summary")
         
         # Get documents for this notebook
         res = supabase.table("documents").select("*").eq("notebook_id", notebook_id).eq("status", True).execute()
@@ -665,21 +683,46 @@ async def generate_summary(request: Request, notebook_id: str):
         summary_prompt = f"""
         Based on the uploaded documents for this notebook, create a brief 2-3 sentence summary of the syllabus content.
         Focus on the main topics and key concepts covered in the course materials.
-        Keep it concise and informative.
         """
         
-        # Use direct function to generate summary
-        summary_content = await query_index_for_notebook(summary_prompt, notebook_id)
+        # Extract assessment information from syllabus
+        assessment_prompt = f"""
+        Please examine the syllabus and course documents to find information about these specific assessments. 
+        
+        Respond in exactly this format:
+        
+        **Midterm:** [If midterms exist, state "Yes" and include count if specified (e.g. "Yes (2 exams)"). If no midterms mentioned, state "Not specified"]
+        **Final:** [If final exam exists, state "Yes" and include any details about timing/format. If no final mentioned, state "Not specified"]  
+        **Weekly Quiz:** [If weekly/regular quizzes exist, state "Yes" and include frequency/details. If no weekly quizzes mentioned, state "Not specified"]
+        
+        Only include information that is explicitly mentioned in the uploaded documents. Do not make assumptions.
+        """
+        
+        # Use direct pinecone service to avoid template formatting
+        from .pinecone_service import pinecone_service
+        summary_content = await pinecone_service.query_notebook(notebook_id, summary_prompt)
+        assessment_content = await pinecone_service.query_notebook(notebook_id, assessment_prompt)
         
         if not summary_content:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
         
+        # Combine summary and assessment information
+        combined_summary = f"""
+# Course Summary
+
+## Syllabus Overview
+{summary_content}
+
+## Assessment Structure
+{assessment_content if assessment_content else "*Assessment details not found in syllabus.*"}
+"""
+        
         # Cache the generated summary
-        await cache_study_feature(notebook_id, "summary", summary_content)
+        await cache_study_feature(notebook_id, "summary", combined_summary)
         
         return StudyFeatureResponse(
             id=str(uuid.uuid4()),
-            content=summary_content,
+            content=combined_summary,
             created=datetime.now().isoformat()
         )
         

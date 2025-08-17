@@ -5,14 +5,8 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-import os
 from pinecone import Pinecone, ServerlessSpec
 from openai import OpenAI
-import uuid
-from typing import List, Dict, Optional, Union
-from datetime import datetime
-import json
-from pathlib import Path
 
 from .database import supabase
 
@@ -148,11 +142,11 @@ class PineconeService:
             response = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that answers questions based on the provided context. Only use information from the context to answer questions. Format your responses using markdown for better readability. Use **bold** for emphasis, *italic* for important terms, and bullet points for lists."},
-                    {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"}
+                    {"role": "system", "content": "You are a helpful assistant that answers questions about course materials and academic topics. When relevant context is provided from the uploaded documents, prioritize that information in your response and cite it appropriately. However, you can also use your general knowledge to provide comprehensive answers, especially for follow-up questions, clarifications, or when the context doesn't fully address the question. Always be clear about what information comes from the provided context versus your general knowledge. Format your responses using markdown for better readability. Use **bold** for emphasis, *italic* for important terms, and bullet points for lists."},
+                    {"role": "user", "content": f"Context from uploaded documents:\n{context}\n\nQuestion: {question}\n\nAnswer:"}
                 ],
                 temperature=0.1,
-                max_tokens=500
+                max_completion_tokens=2000
             )
             
             return response.choices[0].message.content

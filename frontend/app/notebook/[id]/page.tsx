@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Send, Upload, ArrowLeft, ChevronLeft, ChevronRight, FileText, MessageSquare, BookOpen, HelpCircle, FileText as FileTextIcon, Share2, Check, Plus, History, Trash2, Menu, Share, RotateCcw } from 'lucide-react'
+import { Send, Upload, ArrowLeft, ChevronLeft, ChevronRight, FileText, MessageSquare, BookOpen, HelpCircle, FileText as FileTextIcon, Share2, Check, Plus, History, Trash2, Menu, Share, RotateCcw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { createClient } from '@/utils/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import { CourseStatsCharts } from '@/components/CourseStatsPieChart'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface Notebook {
   id: string
@@ -864,9 +866,9 @@ export default function NotebookPage() {
         currentExplanation = ''
         inQuestion = true
       }
-      // Check for options A), B), C), D)
-      else if (inQuestion && /^[A-D]\)/.test(line)) {
-        const option = line.replace(/^[A-D]\)/, '').trim()
+      // Check for options A), B), C), D) with optional whitespace
+      else if (inQuestion && /^\s*[A-D]\)/.test(line)) {
+        const option = line.replace(/^\s*[A-D]\)/, '').trim()
         currentOptions.push(option)
         
         // Check if this is the correct answer
@@ -878,9 +880,9 @@ export default function NotebookPage() {
       else if (inQuestion && line.includes('**Answer:**')) {
         currentExplanation = line.replace('**Answer:**', '').trim()
         // Extract correct answer from explanation
-        const match = line.match(/[A-D]\)/)
+        const match = line.match(/\s*([A-D])\)/)
         if (match) {
-          const answerIndex = 'ABCD'.indexOf(match[0].replace(')', ''))
+          const answerIndex = 'ABCD'.indexOf(match[1])
           if (answerIndex >= 0) {
             currentCorrectAnswer = answerIndex
           }
@@ -983,6 +985,130 @@ export default function NotebookPage() {
       })
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const downloadExamAsPDF = async () => {
+    if (examQuestions.length === 0) {
+      toast({
+        title: "No Exam Questions",
+        description: "Please generate exam questions before downloading",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Create a PDF document
+      const pdf = new jsPDF()
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 20
+      let yPosition = margin
+
+      // Add title
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      const title = `${notebook?.name} - Sample Exam`
+      pdf.text(title, margin, yPosition)
+      yPosition += 20
+
+      // Add date
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      const date = `Generated on: ${new Date().toLocaleDateString()}`
+      pdf.text(date, margin, yPosition)
+      yPosition += 15
+
+      // Add instructions
+      pdf.setFontSize(10)
+      pdf.text('Instructions: Choose the best answer for each question.', margin, yPosition)
+      yPosition += 20
+
+      // Add questions
+      pdf.setFontSize(12)
+      examQuestions.forEach((question, index) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage()
+          yPosition = margin
+        }
+
+        // Question number and text
+        pdf.setFont('helvetica', 'bold')
+        const questionNumber = `${index + 1}. `
+        pdf.text(questionNumber, margin, yPosition)
+        
+        // Split long questions into multiple lines
+        const questionText = question.question
+        const questionLines = pdf.splitTextToSize(questionText, pageWidth - margin * 2 - 20)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(questionLines, margin + 15, yPosition)
+        yPosition += questionLines.length * 5 + 8
+
+        // Options
+        question.options.forEach((option, optionIndex) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage()
+            yPosition = margin
+          }
+          
+          const optionLetter = String.fromCharCode(65 + optionIndex)
+          const optionText = `${optionLetter}) ${option}`
+          const optionLines = pdf.splitTextToSize(optionText, pageWidth - margin * 2 - 20)
+          pdf.text(optionLines, margin + 20, yPosition)
+          yPosition += optionLines.length * 5 + 3
+        })
+        
+        yPosition += 10 // Space between questions
+      })
+
+      // Add answer key on a new page
+      pdf.addPage()
+      yPosition = margin
+      
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Answer Key', margin, yPosition)
+      yPosition += 15
+
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      examQuestions.forEach((question, index) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage()
+          yPosition = margin
+        }
+        
+        const answerLetter = question.correctAnswer >= 0 ? String.fromCharCode(65 + question.correctAnswer) : '?'
+        const answerText = `${index + 1}. ${answerLetter}`
+        pdf.text(answerText, margin, yPosition)
+        
+        if (question.explanation) {
+          const explanationText = `   Explanation: ${question.explanation}`
+          const explanationLines = pdf.splitTextToSize(explanationText, pageWidth - margin * 2)
+          pdf.text(explanationLines, margin, yPosition + 5)
+          yPosition += explanationLines.length * 5 + 8
+        } else {
+          yPosition += 8
+        }
+      })
+
+      // Save the PDF
+      const fileName = `${notebook?.name || 'Exam'}_Sample_Exam.pdf`
+      pdf.save(fileName)
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Exam has been successfully downloaded as PDF",
+      })
+    } catch (error) {
+      console.error('Failed to download PDF:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -1136,17 +1262,18 @@ export default function NotebookPage() {
 
   return (
     <>
-      <header className="flex items-center justify-between px-8 py-6 border-b border-muted bg-uchicago-crimson">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')} className="mr-2 text-white hover:bg-uchicago-maroon">
+      <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 border-b border-muted bg-uchicago-crimson">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')} className="text-white hover:bg-uchicago-maroon flex-shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold truncate max-w-xs md:max-w-md lg:max-w-2xl text-white">{notebook.name}</h1>
-          <span className="text-white/80 text-sm hidden md:inline">{notebook.description}</span>
+          <h1 className="text-lg md:text-2xl font-bold truncate text-white">{notebook.name}</h1>
+          <span className="text-white/80 text-sm hidden lg:inline truncate">{notebook.description}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="default" onClick={handleShare} className="flex items-center gap-2 bg-white text-uchicago-crimson border border-uchicago-crimson hover:bg-uchicago-maroon hover:text-white">
-            <Share2 className="h-4 w-4" /> Share
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button variant="default" onClick={handleShare} className="flex items-center gap-2 bg-white text-uchicago-crimson border border-uchicago-crimson hover:bg-uchicago-maroon hover:text-white px-3 md:px-4">
+            <Share2 className="h-4 w-4" /> 
+            <span className="hidden sm:inline">Share</span>
           </Button>
         </div>
       </header>
@@ -1572,14 +1699,26 @@ export default function NotebookPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Sample Exam Questions</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => generateStudyFeature('exam')}
-                      disabled={isGenerating}
-                    >
-                      Regenerate
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={downloadExamAsPDF}
+                        disabled={examQuestions.length === 0}
+                        className="flex items-center gap-2 bg-uchicago-crimson hover:bg-uchicago-maroon"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateStudyFeature('exam')}
+                        disabled={isGenerating}
+                      >
+                        Regenerate
+                      </Button>
+                    </div>
                   </div>
                   {examQuestions.length > 0 ? (
                     <div className="space-y-6 max-h-[calc(100vh-300px)] overflow-y-auto">

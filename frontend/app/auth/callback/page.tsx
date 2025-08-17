@@ -23,9 +23,13 @@ export default function AuthCallbackPage() {
         }
 
         if (data.session?.user) {
-          // Check if user has uchicago.edu domain
+          // Check for backroom flag in URL params
+          const urlParams = new URLSearchParams(window.location.search);
+          const isBackroom = urlParams.get('backroom') === 'true';
+
+          // Check if user has uchicago.edu domain (skip for backroom users)
           const userEmail = data.session.user.email;
-          if (!userEmail || !userEmail.endsWith('@uchicago.edu')) {
+          if (!isBackroom && (!userEmail || !userEmail.endsWith('@uchicago.edu'))) {
             setError("Only @uchicago.edu accounts are allowed");
             await supabase.auth.signOut();
             setLoading(false);

@@ -450,6 +450,92 @@ async def parse_docx_file(
         gc.collect()
 
 
+async def parse_markdown_file(file_path: str) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse Markdown (.md) files and other text-based files.
+    """
+    text: Optional[str] = None
+    images: Optional[List[str]] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    
+    try:
+        # Read file as plain text with multiple encoding attempts
+        encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    text = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if text is None:
+            # If all encodings fail, read as binary and decode with errors='ignore'
+            with open(file_path, 'rb') as f:
+                text = f.read().decode('utf-8', errors='ignore')
+        
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+    finally:
+        import gc
+        gc.collect()
+
+
+async def parse_html_file(file_path: str) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
+    """
+    Parse HTML files with basic text extraction.
+    """
+    text: Optional[str] = None
+    images: Optional[List[str]] = None
+    tables: Optional[List[pd.DataFrame]] = None
+    
+    try:
+        # Try to use BeautifulSoup for better HTML parsing if available
+        try:
+            from bs4 import BeautifulSoup
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            # Get text and clean it up
+            text = soup.get_text()
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+            
+        except ImportError:
+            # Fallback to simple text extraction without BeautifulSoup
+            with open(file_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Simple regex-based tag removal (basic fallback)
+            import re
+            text = re.sub(r'<[^>]+>', '', html_content)
+            text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text, images, tables
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # Fallback to markdown parser
+        return await parse_markdown_file(file_path)
+    finally:
+        import gc
+        gc.collect()
+
+
 async def parse_file(
     file_path: str, with_images: bool = False, with_tables: bool = False
 ) -> Union[Tuple[Optional[str], Optional[List[str]], Optional[List[pd.DataFrame]]]]:
@@ -470,6 +556,36 @@ async def parse_file(
     elif file_ext == '.docx':
         # Use specialized DOCX parser
         return await parse_docx_file(file_path)
+    elif file_ext in ['.md', '.txt']:
+        # Use Markdown/text parser for Markdown and plain text files
+        return await parse_markdown_file(file_path)
+    elif file_ext == '.html':
+        # Use HTML parser for HTML files
+        return await parse_html_file(file_path)
+    elif file_ext == '.pdf':
+        # Use PyMuPDF specifically for PDF files with image extraction
+        text, images, tables = await parse_file_pymupdf(file_path, with_images=True, with_tables=with_tables)
+        
+        if text and len(text.strip()) > 50:
+            # Check if extraction quality is good
+            if not is_handwritten_or_poor_extraction(text):
+                return text, images, tables
+            else:
+                pass
+        else:
+            pass
+        
+        # Fallback to Docling for better extraction
+        try:
+            text, images, tables = await parse_file_docling(file_path, with_images=True, with_tables=with_tables)
+            if text and len(text.strip()) > 50:
+                return text, images, tables
+            else:
+                return None, None, None
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return None, None, None
     else:
         # Use existing parsers for document files
         # Try PyMuPDF first (fast and lightweight) - enable images by default for PDFs

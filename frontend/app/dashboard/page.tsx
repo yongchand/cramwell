@@ -75,25 +75,20 @@ export default function DashboardPage() {
     });
   };
   
-  // Efficient: Fetch only paginated notebooks for All Courses
+  // Fetch all notebooks once for client-side search and pagination
   useEffect(() => {
     const fetchNotebooks = async () => {
       setLoading(true);
       const supabase = createClient();
-      // Get total count for pagination
-      const { count } = await supabase
-        .from("notebooks")
-        .select("id", { count: "exact", head: true });
-      // Fetch only the current page
+      // Fetch all notebooks at once
       const { data, error } = await supabase
         .from("notebooks")
         .select("*")
-        .order("name")
-        .range((currentPage - 1) * COURSES_PER_PAGE, currentPage * COURSES_PER_PAGE - 1);
+        .order("name");
       if (!error && data) {
         setNotebooks(data);
         
-        // Fetch summary data for these notebooks
+        // Fetch summary data for all notebooks
         const notebookIds = data.map(nb => nb.id);
         if (notebookIds.length > 0) {
           const { data: summaryData, error: summaryError } = await supabase
@@ -105,16 +100,11 @@ export default function DashboardPage() {
           }
         }
       }
-      setTotalNotebooks(count || 0);
       setLoading(false);
     };
     fetchNotebooks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, search]);
+  }, []); // Only fetch once on component mount
 
-  // Track total notebooks for pagination
-  const [totalNotebooks, setTotalNotebooks] = useState(0);
-  const totalPages = Math.ceil(totalNotebooks / COURSES_PER_PAGE);
   // Filter All Courses by search
   const filteredNotebooks = notebooks.filter(nb => {
     const searchLower = search.trim().toLowerCase();
@@ -124,6 +114,13 @@ export default function DashboardPage() {
       (nb.professor?.toLowerCase().includes(searchLower) ?? false)
     );
   });
+
+  // Pagination for filtered results
+  const totalPages = Math.ceil(filteredNotebooks.length / COURSES_PER_PAGE);
+  const paginatedNotebooks = filteredNotebooks.slice(
+    (currentPage - 1) * COURSES_PER_PAGE,
+    currentPage * COURSES_PER_PAGE
+  );
   // Filtered data for My Courses
   const filteredMyCourses = myCourses.filter(nb => enrolledIds.includes(nb.id));
 
@@ -265,24 +262,26 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Bar */}
       <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#7C2529'}}>
-        <div className="flex items-center gap-3">
-          <img src="/logo-icon.svg" alt="Cramwell" className="h-8 w-8" />
-          <div className="text-2xl font-extrabold text-white tracking-tight">Cramwell</div>
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          <img src="/logo-icon.svg" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
+          <div className="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">Cramwell</div>
         </div>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2 md:gap-3 items-center flex-shrink-0">
           <Button
             variant="outline"
-            className="rounded-full px-6 py-1 text-sm font-semibold border-white text-white hover:bg-white/10 hover:text-white bg-uchicago-crimson/80"
+            className="rounded-full px-3 md:px-6 py-1 text-sm font-semibold border-white text-white hover:bg-white/10 hover:text-white bg-uchicago-crimson/80"
             onClick={() => setShareOpen(true)}
           >
-            <Share2 className="w-4 h-4 mr-2" /> Share
+            <Share2 className="w-4 h-4 md:mr-2" /> 
+            <span className="hidden md:inline">Share</span>
           </Button>
           <Button
             variant="destructive"
-            className="rounded-full px-6 py-1 text-sm font-semibold bg-white text-uchicago-crimson border-white hover:bg-white/80 hover:text-uchicago-crimson"
+            className="rounded-full px-3 md:px-6 py-1 text-sm font-semibold bg-white text-uchicago-crimson border-white hover:bg-white/80 hover:text-uchicago-crimson"
             onClick={handleLogout}
           >
-            <LogOut className="w-4 h-4 mr-2" /> Logout
+            <LogOut className="w-4 h-4 md:mr-2" /> 
+            <span className="hidden md:inline">Logout</span>
           </Button>
         </div>
       </header>
@@ -306,13 +305,13 @@ export default function DashboardPage() {
         {/* Glassmorphism overlay */}
         <div className="absolute inset-0 bg-white/30 dark:bg-gray-900/40 backdrop-blur-md z-0" />
         <div className="relative z-10 flex flex-col items-center">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-1 md:gap-3 mb-2">
             <img 
               src="/mascot_chicago.png" 
               alt="Chicago Mascot" 
               className="w-16 h-16 md:w-20 md:h-20"
             />
-            <h1 className="font-serif text-5xl md:text-6xl font-extrabold mb-3 text-center drop-shadow-lg tracking-tight" style={{ fontFamily: 'Merriweather, serif' }}>
+            <h1 className="font-serif text-3xl md:text-6xl font-extrabold mb-3 text-left md:text-center drop-shadow-lg tracking-tight" style={{ fontFamily: 'Merriweather, serif' }}>
               UChicago Cramwell
             </h1>
           </div>
@@ -387,7 +386,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between mt-auto pt-2">
                       <button
                         onClick={(e) => toggleCardFlip(nb.id, e)}
-                        className="px-2 py-1 rounded-full bg-uchicago-crimson text-white text-xs font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
+                        className="px-6 py-1 rounded-full bg-uchicago-crimson text-white text-sm font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
                         title="View course summary"
                       >
                         {isFlipped ? "Course Overview" : "Course Summary"}
@@ -517,14 +516,14 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          ) : totalNotebooks === 0 ? (
+          ) : notebooks.length === 0 ? (
             <div className="h-12 flex items-center justify-center text-muted-foreground bg-muted/40 rounded-lg border border-dashed border-muted">
               No courses available yet.
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-                {filteredNotebooks.map((nb) => {
+                {paginatedNotebooks.map((nb) => {
                   const isEnrolled = enrolledIds.includes(nb.id);
                   const summary = getSummaryForNotebook(nb.id);
                   const isFlipped = flippedCards.has(nb.id);
@@ -556,7 +555,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mt-auto pt-2">
                         <button
                           onClick={(e) => toggleCardFlip(nb.id, e)}
-                          className="px-2 py-1 rounded-full bg-uchicago-crimson text-white text-xs font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
+                          className="px-6 py-1 rounded-full bg-uchicago-crimson text-white text-sm font-semibold hover:bg-uchicago-crimson/90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 mr-2"
                           title="View course summary"
                         >
                           {isFlipped ? "Course Overview" : "Course Summary"}
@@ -639,7 +638,7 @@ export default function DashboardPage() {
                           setCurrentPage(p => Math.max(1, p - 1));
                         }}
                         aria-disabled={currentPage === 1}
-                        className={currentPage === 1 ? 'opacity-50 pointer-events-none' : ''}
+                        className={`w-auto px-3 ${currentPage === 1 ? 'opacity-50 pointer-events-none' : ''}`}
                       />
                     </PaginationItem>
                     {Array.from({ length: totalPages }).map((_, i) => (
@@ -664,7 +663,7 @@ export default function DashboardPage() {
                           setCurrentPage(p => Math.min(totalPages, p + 1));
                         }}
                         aria-disabled={currentPage === totalPages}
-                        className={currentPage === totalPages ? 'opacity-50 pointer-events-none' : ''}
+                        className={`w-auto px-3 ${currentPage === totalPages ? 'opacity-50 pointer-events-none' : ''}`}
                       />
                     </PaginationItem>
                   </PaginationContent>
