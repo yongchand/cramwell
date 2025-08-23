@@ -45,7 +45,9 @@ export default function AuthCallbackPage() {
               last_login: new Date().toISOString(),
               is_active: true,
             },
-          ]);
+          ], {
+            onConflict: 'id'
+          });
 
           if (upsertError) {
             console.error("Upsert error:", upsertError);

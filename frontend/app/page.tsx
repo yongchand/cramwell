@@ -14,13 +14,13 @@ export default function LandingPage() {
       <section className="flex-1 flex flex-col justify-center items-center py-24 px-4 relative z-10">
         <div className="max-w-6xl w-full text-center">
           <div className="flex justify-center mb-6">
-            <img src="/logo-icon.svg" alt="Cramwell Logo" className="h-24 w-24" />
+            <img src="/Cramwell_Logo_Icon.png" alt="Cramwell Logo" className="h-24 w-24" />
           </div>
           <h1 className="text-5xl font-extrabold mb-4 tracking-tight text-gray-900">
-            Cramwell
+            Cramwell AI
           </h1>
           <p className="text-lg text-gray-600 mb-8">
-            Study together, hack professors
+            Better AI for College
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
             <Link href="/auth/login">
@@ -52,7 +52,7 @@ export default function LandingPage() {
           <div className="mt-10 text-center">
             <p className="text-base text-gray-700 font-medium">
               Currently supported for <span className="font-semibold">University of Chicago</span> students only.<br />
-              Want Cramwell at your school? Contact <a href="mailto:edwardchun98@gmail.com" className="text-blue-600 underline">edwardchun98@gmail.com</a>.
+              Want Cramwell AI at your school? Contact <a href="mailto:support@cramwell.ai" className="text-blue-600 underline">support@cramwell.ai</a>.
             </p>
           </div>
         </div>
@@ -61,11 +61,11 @@ export default function LandingPage() {
       <footer className="border-t border-gray-200 py-8 bg-white/80 mt-8 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
           <div className="flex items-center space-x-2">
-            <img src="/logo.svg" alt="Cramwell" className="h-6 w-6" />
+            <img src="/Cramwell_Logo_Icon.png" alt="Cramwell AI" className="h-6 w-6" />
             <span className="text-gray-700 font-semibold">Cramwell</span>
           </div>
           <div className="text-gray-500 text-sm mt-4 md:mt-0">
-            &copy; {new Date().getFullYear()} Cramwell. All rights reserved.
+            &copy; {new Date().getFullYear()} Cramwell AI. All rights reserved.
           </div>
         </div>
       </footer>

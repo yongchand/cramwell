@@ -263,7 +263,7 @@ export default function DashboardPage() {
       {/* Top Bar */}
       <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#7C2529'}}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-          <img src="/logo-icon.svg" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
+          <img src="/Cramwell_Logo_Icon.png" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
           <div className="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">Cramwell</div>
         </div>
         <div className="flex gap-2 md:gap-3 items-center flex-shrink-0">
@@ -312,10 +312,10 @@ export default function DashboardPage() {
               className="w-16 h-16 md:w-20 md:h-20"
             />
             <h1 className="font-serif text-3xl md:text-6xl font-extrabold mb-3 text-left md:text-center drop-shadow-lg tracking-tight" style={{ fontFamily: 'Merriweather, serif' }}>
-              UChicago Cramwell
+              UChicago Cramwell AI
             </h1>
           </div>
-          <p className="text-lg md:text-xl mb-4 text-center font-medium opacity-90">Your Unfair Advantage to a Perfect GPA</p>
+          <p className="text-lg md:text-xl mb-4 text-center font-medium opacity-90">Better AI for College</p>
         </div>
       </motion.section>
 
@@ -671,6 +671,38 @@ export default function DashboardPage() {
               )}
             </>
           )}
+        </section>
+
+        {/* Survey Banner */}
+        <section className="w-full max-w-7xl mx-auto mt-16 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="bg-gradient-to-r from-uchicago-crimson to-red-600 rounded-2xl p-6 md:p-8 text-white shadow-lg border border-red-200"
+          >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h3 className="text-xl md:text-2xl font-bold mb-2">🚧 We're Still Under Active Development!</h3>
+                <p className="text-white/90 text-sm md:text-base">
+                  Cramwell is actively under development. Your feedback helps us build the best study platform for UChicago students.
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSfFQTHTSthSCqULr4dOzC1mIgeqY_pwNz7m-70o4vem3yzoyw/viewform?usp=sharing&ouid=108742123144679612668"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-white text-uchicago-crimson px-6 py-3 rounded-full font-semibold text-sm md:text-base hover:bg-gray-50 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                >
+                  📝 Take Our Survey
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </motion.div>
         </section>
       </main>
     </div>

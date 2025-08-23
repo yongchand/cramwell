@@ -10,10 +10,10 @@ export const metadata: Metadata = {
   description: 'Study together, hack professors',
   icons: {
     icon: [
-      { url: '/logo-icon.svg', type: 'image/svg+xml' }
+      { url: '/Cramwell_Logo_Icon.png', type: 'image/png' }
     ],
-    shortcut: '/logo-icon.svg',
-    apple: '/logo-icon.svg'
+    shortcut: '/Cramwell_Logo_Icon.png',
+    apple: '/Cramwell_Logo_Icon.png'
   },
 }
 
