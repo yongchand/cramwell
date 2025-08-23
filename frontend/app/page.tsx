@@ -34,7 +34,8 @@ export default function LandingPage() {
               </button>
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto">
+          {/* Features grid - hidden on mobile, visible on desktop */}
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto">
             <div className="flex flex-col items-center bg-white/60 backdrop-blur-sm rounded-xl p-8 shadow-lg min-h-[200px] justify-center">
               <span className="text-2xl font-bold text-gray-800 mb-4">Chat with AI</span>
               <span className="text-gray-500 text-center">Talk with an AI chatbot that actually knows your material</span>
@@ -57,6 +58,27 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      
+      {/* Mobile-only Features Section */}
+      <section className="block md:hidden py-16 px-4 relative z-10 bg-white/80">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 gap-8">
+            <div className="flex flex-col items-center bg-white/60 backdrop-blur-sm rounded-xl p-8 shadow-lg min-h-[200px] justify-center">
+              <span className="text-2xl font-bold text-gray-800 mb-4">Chat with AI</span>
+              <span className="text-gray-500 text-center">Talk with an AI chatbot that actually knows your material</span>
+            </div>
+            <div className="flex flex-col items-center bg-white/60 backdrop-blur-sm rounded-xl p-8 shadow-lg min-h-[200px] justify-center">
+              <span className="text-2xl font-bold text-gray-800 mb-4">Study Guides</span>
+              <span className="text-gray-500 text-center">Practice with AI-generated study guides based on your actual materials</span>
+            </div>
+            <div className="flex flex-col items-center bg-white/60 backdrop-blur-sm rounded-xl p-8 shadow-lg min-h-[200px] justify-center">
+              <span className="text-2xl font-bold text-gray-800 mb-4">Course Summary</span>
+              <span className="text-gray-500 text-center">Get comprehensive course summaries and key insights</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      
       {/* Footer */}
       <footer className="border-t border-gray-200 py-8 bg-white/80 mt-8 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">

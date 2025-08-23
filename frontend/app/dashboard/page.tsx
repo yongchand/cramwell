@@ -263,7 +263,7 @@ export default function DashboardPage() {
       {/* Top Bar */}
       <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#7C2529'}}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-          <img src="/Cramwell_Logo_Icon.png" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
+          <img src="/Cramwell_Logo_Icon_White.png" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
           <div className="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">Cramwell</div>
         </div>
         <div className="flex gap-2 md:gap-3 items-center flex-shrink-0">
@@ -315,7 +315,7 @@ export default function DashboardPage() {
               UChicago Cramwell AI
             </h1>
           </div>
-          <p className="text-lg md:text-xl mb-4 text-center font-medium opacity-90">Better AI for College</p>
+          {/* <p className="text-lg md:text-xl mb-4 text-center font-medium opacity-90">Better AI for College</p> */}
         </div>
       </motion.section>
 
