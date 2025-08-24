@@ -118,7 +118,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Development
         "https://localhost:3000",  # Development HTTPS
-        "https://cramwell.vercel.app",  # Production frontend
+        "https://cramwell.vercel.app",  # Production frontend (Vercel)
+        "https://www.cramwell.ai",  # Production custom domain
+        "https://cramwell.ai",  # Production custom domain (without www)
         "https://cramwell-backend.onrender.com",  # Production backend
         os.getenv("FRONTEND_URL", "https://cramwell.vercel.app"),  # Production frontend URL
         os.getenv("FRONTEND_URL_DEV", "http://localhost:3000"),  # Development frontend URL

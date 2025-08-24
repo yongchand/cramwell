@@ -14,9 +14,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // Redirect authenticated users away from auth pages
+  const authRoutes = ["/auth/login", "/auth/signup", "/auth/reset"];
+  const isAuthPage = authRoutes.some((route) => request.nextUrl.pathname.startsWith(route));
+  if (isAuthPage && user) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/notebook/:path*", "/dashboard/:path*"],
+  matcher: ["/notebook/:path*", "/dashboard/:path*", "/auth/:path*"],
 }; 
