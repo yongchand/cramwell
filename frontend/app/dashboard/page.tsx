@@ -259,12 +259,12 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 text-foreground flex flex-col">
       {/* Top Bar */}
       <header className="w-full flex items-center justify-between px-4 md:px-8 py-4 border-b border-muted" style={{backgroundColor: '#7C2529'}}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <img src="/Cramwell_Logo_Icon_White.png" alt="Cramwell" className="h-8 w-8 flex-shrink-0" />
-          <div className="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">Cramwell</div>
+          <div className="text-xl md:text-2xl text-white tracking-tight truncate" style={{ fontFamily: 'PoppinsLight, sans-serif' }}>Cramwell</div>
         </div>
         <div className="flex gap-2 md:gap-3 items-center flex-shrink-0">
           <Button
@@ -311,8 +311,8 @@ export default function DashboardPage() {
               alt="Chicago Mascot" 
               className="w-16 h-16 md:w-20 md:h-20"
             />
-            <h1 className="font-serif text-3xl md:text-6xl font-extrabold mb-3 text-left md:text-center drop-shadow-lg tracking-tight" style={{ fontFamily: 'Merriweather, serif' }}>
-              UChicago Cramwell AI
+            <h1 className="font-serif font-bold text-3xl md:text-6xl mb-3 text-left md:text-center drop-shadow-lg tracking-tight">
+              UChicago Cramwell
             </h1>
           </div>
           {/* <p className="text-lg md:text-xl mb-4 text-center font-medium opacity-90">Better AI for College</p> */}
@@ -322,7 +322,7 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="flex flex-col items-center w-full flex-1 px-4 pb-16 bg-gradient-to-b from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
         {/* My Courses */}
-        <section className="w-full max-w-7xl mx-auto mb-12">
+        <section className="w-full max-w-7xl mx-auto mb-8">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-6 h-6 text-uchicago-crimson" />
             <h2 className="text-2xl font-bold">My Courses</h2>
@@ -474,7 +474,7 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
-        <div className="w-full max-w-7xl mx-auto border-t border-muted mb-12" />
+        <div className="w-full max-w-7xl mx-auto border-t border-muted mb-6" />
         {/* All Courses */}
         <section className="w-full max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
