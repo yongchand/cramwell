@@ -207,16 +207,9 @@ export default function NotebookPage() {
         // Try to fetch review metadata for general_review documents
         if (doc.document_type === 'general_review') {
           try {
-            const reviewFileName = `review_${doc.id}.json`;
-            const reviewFilePath = `private/${notebookId}/reviews/${reviewFileName}`;
-            
-            const { data: reviewFile, error: reviewError } = await supabase.storage
-              .from('documents')
-              .download(reviewFilePath);
-            
-            if (!reviewError && reviewFile) {
-              const reviewText = await reviewFile.text();
-              reviewData = JSON.parse(reviewText);
+            // Get review data from document_info.review_data (new implementation)
+            if (doc.document_info && doc.document_info.review_data) {
+              reviewData = doc.document_info.review_data;
             }
           } catch (e) {
             console.warn(`Failed to load review data for ${doc.document_name}:`, e);
