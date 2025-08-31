@@ -655,7 +655,7 @@ async def query_index(question: str) -> Union[str, None]:
 async def process_file_for_notebook(
     filename: str,
     notebook_id: str,
-    document_type: str = "general_review",
+    document_type: str = "course_files",
 ) -> Union[Tuple[str, None], Tuple[None, None], Tuple[str, str]]:
     """
     Process a file and create embeddings specific to a notebook using Pinecone.

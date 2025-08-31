@@ -19,6 +19,8 @@ interface ReviewMetadata {
   courseReview?: number;
   professorReview?: number;
   inputHours?: number;
+  difficulty?: string;
+  additional_comment?: string;
 }
 
 export function UploadDialog({ open, onClose, onUpload, isUploading = false }: UploadDialogProps) {
@@ -36,7 +38,9 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
     grade: 'A',
     courseReview: 5,
     professorReview: 5,
-    inputHours: 0
+    inputHours: 0,
+    difficulty: '',
+    additional_comment: ''
   });
 
   const handleFiles = (files: FileList | File[]) => {
@@ -80,8 +84,8 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
       setUploadSuccess(false);
       try {
         const metadata = kind === 'general_review' ? reviewMetadata : undefined;
-        // For general_review, pass empty array if no files selected
-        const filesToUpload = kind === 'general_review' && selectedFiles.length === 0 ? [] : selectedFiles;
+        // For general_review, pass empty array since no files are allowed
+        const filesToUpload = kind === 'general_review' ? [] : selectedFiles;
         await onUpload(filesToUpload, kind, metadata);
         // Clear files after upload is complete
         setSelectedFiles([]);
@@ -245,45 +249,59 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
                 "Professor Review (1-5 stars)"
               )}
             </div>
+
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="difficulty">Please comment on the level of difficulty of the course relative to your background and experience</Label>
+              <textarea
+                id="difficulty"
+                value={reviewMetadata.difficulty || ''}
+                onChange={(e) => setReviewMetadata(prev => ({ ...prev, difficulty: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-vertical"
+                placeholder="Describe the difficulty level, challenges faced, and how it compared to other courses you've taken..."
+              />
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="additional_comment">Additional Comments</Label>
+              <textarea
+                id="additional_comment"
+                value={reviewMetadata.additional_comment || ''}
+                onChange={(e) => setReviewMetadata(prev => ({ ...prev, additional_comment: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-vertical"
+                placeholder="Any additional thoughts, tips, or comments about the course..."
+              />
+            </div>
           </div>
         )}
 
-        <div
-          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive ? 'border-primary bg-muted' : 'border-muted'}`}
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          style={{ cursor: 'pointer' }}
-        >
-          <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-          {kind === 'general_review' ? (
-            <>
-              <p className="mb-2 text-muted-foreground">Optional: Drag & drop course files here, or click to select</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                You can save review information without uploading files
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mb-2 text-muted-foreground">Drag & drop files here, or click to select</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                Supported: PDF, DOC, DOCX, PPT, PPTX, XLSX, CSV, IPYNB (max 25MB each)
-              </p>
-            </>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={handleFileInput}
-            accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.csv,.ipynb"
-          />
-        </div>
+        {/* File upload section - only show for non-general_review types */}
+        {kind !== 'general_review' && (
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive ? 'border-primary bg-muted' : 'border-muted'}`}
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            style={{ cursor: 'pointer' }}
+          >
+            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="mb-2 text-muted-foreground">Drag & drop files here, or click to select</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Supported: PDF, DOC, DOCX, PPT, PPTX, XLSX, CSV, IPYNB (max 25MB each)
+            </p>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileInput}
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.csv,.ipynb"
+            />
+          </div>
+        )}
         
-        {selectedFiles.length > 0 && (
+        {selectedFiles.length > 0 && kind !== 'general_review' && (
           <div className="mt-4 max-h-40 overflow-y-auto border rounded-md p-2 bg-muted">
             <ul className="text-sm">
               {selectedFiles.map((file, idx) => (

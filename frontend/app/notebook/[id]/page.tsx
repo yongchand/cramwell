@@ -426,6 +426,68 @@ export default function NotebookPage() {
   }
 
   const handleFileUpload = async (files: FileList | File[], kind: string, metadata?: any) => {
+    // For general_review, handle via backend API
+    if (kind === 'general_review') {
+      if (!metadata) {
+        toast({
+          title: "Error",
+          description: "Review metadata is required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        setIsUploading(true);
+
+        // Send review data to backend API
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/general-review/`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            takenYear: metadata.takenYear,
+            takenSemester: metadata.takenSemester,
+            grade: metadata.grade,
+            courseReview: metadata.courseReview,
+            professorReview: metadata.professorReview,
+            inputHours: metadata.inputHours,
+            difficulty: metadata.difficulty,
+            additional_comment: metadata.additional_comment
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to save review: ${errorText}`);
+        }
+
+        const result = await response.json();
+
+        toast({
+          title: "Review Saved",
+          description: "Your course review has been saved successfully",
+        });
+
+        // Reload sources to show the new review
+        await loadSources();
+        setUploadDialogOpen(false);
+
+      } catch (error) {
+        console.error('Failed to save review:', error);
+        toast({
+          title: "Error",
+          description: `Failed to save review: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    // Existing file upload logic for other document types
     if (!files || files.length === 0) return;
 
     const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB limit
@@ -488,63 +550,6 @@ export default function NotebookPage() {
         const file = files[i];
         const filePath = `private/${notebookId}/${userId}/${kind}/${file.name}`;
         
-        // For general_review, skip file upload and only save metadata
-        if (kind === 'general_review') {
-          
-          // Create a placeholder document record for general review
-          const documentDataToInsert: any = {
-            notebook_id: notebookId,
-            document_type: kind,
-            document_name: `Review_${new Date().toISOString().split('T')[0]}`,
-            document_path: `general_review_metadata`,
-            file_size: 0,
-            document_info: {
-              mime_type: 'application/json',
-              upload_timestamp: new Date().toISOString()
-            }
-          };
-
-          const { data: documentData, error: documentError } = await supabase
-            .from('documents')
-            .insert(documentDataToInsert)
-            .select()
-            .single();
-
-          if (documentError) {
-            throw new Error(`Failed to store review metadata: ${documentError.message}`);
-          }
-
-          // Save review metadata as JSON file in S3
-          if (metadata) {
-            const reviewData = {
-              document_id: documentData.id,
-              notebook_id: notebookId,
-              taken_year: metadata.takenYear,
-              taken_semester: metadata.takenSemester,
-              grade: metadata.grade,
-              course_review: metadata.courseReview,
-              professor_review: metadata.professorReview,
-              input_hours: metadata.inputHours,
-              created_at: new Date().toISOString()
-            };
-
-            const reviewFileName = `review_${documentData.id}.json`;
-            const reviewFilePath = `private/${notebookId}/${userId}/reviews/${reviewFileName}`;
-            
-            // Upload review metadata as JSON file
-            const { error: reviewError } = await supabase.storage
-              .from('documents')
-              .upload(reviewFilePath, new Blob([JSON.stringify(reviewData, null, 2)], { type: 'application/json' }), { upsert: false });
-            
-            if (reviewError) {
-              console.warn(`Failed to save review metadata: ${reviewError.message}`);
-            }
-          }
-
-          uploadedFiles.push(`Review_${new Date().toISOString().split('T')[0]}`);
-          continue;
-        }
-
         // Check for duplicate by name, size, and path
         const { data: existingDocs } = await supabase
           .from('documents')
@@ -610,7 +615,7 @@ export default function NotebookPage() {
       }
 
       // Process uploaded files through the backend API to add them to Pinecone
-      if (uploadedFiles.length > 0 && kind !== 'general_review') {
+      if (uploadedFiles.length > 0) {
         
         for (const fileName of uploadedFiles) {
           try {
@@ -653,59 +658,7 @@ export default function NotebookPage() {
         }
       }
 
-      // Handle case where no files are provided for general_review
-      if (kind === 'general_review' && files.length === 0 && metadata) {
-        
-        // Create a placeholder document record for general review
-        const documentDataToInsert: any = {
-          notebook_id: notebookId,
-          document_type: kind,
-          document_name: `Review_${new Date().toISOString().split('T')[0]}`,
-          document_path: `general_review_metadata`,
-          file_size: 0,
-          document_info: {
-            mime_type: 'application/json',
-            upload_timestamp: new Date().toISOString()
-          }
-        };
 
-        const { data: documentData, error: documentError } = await supabase
-          .from('documents')
-          .insert(documentDataToInsert)
-          .select()
-          .single();
-
-        if (documentError) {
-          throw new Error(`Failed to store review metadata: ${documentError.message}`);
-        }
-
-        // Save review metadata as JSON file in S3
-        const reviewData = {
-          document_id: documentData.id,
-          notebook_id: notebookId,
-          taken_year: metadata.takenYear,
-          taken_semester: metadata.takenSemester,
-          grade: metadata.grade,
-          course_review: metadata.courseReview,
-          professor_review: metadata.professorReview,
-          input_hours: metadata.inputHours,
-          created_at: new Date().toISOString()
-        };
-
-        const reviewFileName = `review_${documentData.id}.json`;
-        const reviewFilePath = `private/${notebookId}/${userId}/reviews/${reviewFileName}`;
-        
-        // Upload review metadata as JSON file
-        const { error: reviewError } = await supabase.storage
-          .from('documents')
-          .upload(reviewFilePath, new Blob([JSON.stringify(reviewData, null, 2)], { type: 'application/json' }), { upsert: false });
-        
-        if (reviewError) {
-          console.warn(`Failed to save review metadata: ${reviewError.message}`);
-        }
-
-        uploadedFiles.push(`Review_${new Date().toISOString().split('T')[0]}`);
-      }
 
       // Show results
       let successMessage = "";

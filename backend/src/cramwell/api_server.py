@@ -238,6 +238,16 @@ class StudyFeatureResponse(BaseModel):
     content: str
     created: str
 
+class GeneralReviewRequest(BaseModel):
+    takenYear: Optional[int] = None
+    takenSemester: Optional[str] = None
+    grade: Optional[str] = None
+    courseReview: Optional[int] = None
+    professorReview: Optional[int] = None
+    inputHours: Optional[float] = None
+    difficulty: Optional[str] = None
+    additional_comment: Optional[str] = None
+
 @app.get("/")
 async def root():
     return {"message": "Cramwell API"}
@@ -329,7 +339,7 @@ async def delete_notebook(notebook_id: str, user_id: Optional[str] = Depends(req
 
 @app.post("/notebooks/{notebook_id}/upload/", response_model=SourceResponse)
 @limiter.limit("5/minute")
-async def upload_source(request: Request, notebook_id: str, file: UploadFile = File(...), document_type: str = "general_review", user_id: Optional[str] = Depends(require_auth)):
+async def upload_source(request: Request, notebook_id: str, file: UploadFile = File(...), document_type: str = "course_files", user_id: Optional[str] = Depends(require_auth)):
     """Upload and process a file for a specific notebook"""
     if not notebook_exists(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
@@ -402,6 +412,127 @@ async def upload_source(request: Request, notebook_id: str, file: UploadFile = F
         # Force garbage collection
         import gc
         gc.collect()
+
+
+@app.post("/notebooks/{notebook_id}/general-review/")
+async def save_general_review(notebook_id: str, review_request: GeneralReviewRequest, user_id: Optional[str] = Depends(require_auth)):
+    """Save general review data for a specific notebook"""
+    if not notebook_exists(notebook_id):
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    
+    # Verify user has access to this notebook (optional for now)
+    if user_id and not await verify_notebook_access(notebook_id, user_id):
+        raise HTTPException(status_code=403, detail="Access denied to this notebook")
+    
+    try:
+        now = datetime.now().isoformat()
+        
+        # Create document record for general review
+        document_data = {
+            "notebook_id": notebook_id,
+            "document_type": "general_review",
+            "document_name": f"Review_{now.split('T')[0]}",
+            "document_path": "general_review_metadata",
+            "file_size": 0,
+            "document_info": {
+                "mime_type": "application/json",
+                "upload_timestamp": now
+            },
+            "status": True,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        # Insert document record
+        res = supabase.table("documents").insert(document_data).execute()
+        if not res.data:
+            raise HTTPException(status_code=500, detail="Failed to create document record")
+        
+        document_id = res.data[0]["id"]
+        
+        # Create review data JSON
+        review_data = {
+            "document_id": document_id,
+            "notebook_id": notebook_id,
+            "taken_year": review_request.takenYear,
+            "taken_semester": review_request.takenSemester,
+            "grade": review_request.grade,
+            "course_review": review_request.courseReview,
+            "professor_review": review_request.professorReview,
+            "input_hours": review_request.inputHours,
+            "difficulty": review_request.difficulty,
+            "additional_comment": review_request.additional_comment,
+            "created_at": now
+        }
+        
+        # Store review data in document_info field of documents table
+        updated_document_info = document_data["document_info"].copy()
+        updated_document_info["review_data"] = review_data
+        
+        supabase.table("documents").update({
+            "document_info": updated_document_info
+        }).eq("id", document_id).execute()
+        
+        # Create searchable text content from review data for Pinecone
+        review_text_content = f"""Course Review Information:
+
+Year Taken: {review_request.takenYear or 'Not specified'}
+Semester: {review_request.takenSemester or 'Not specified'}
+Grade Received: {review_request.grade or 'Not specified'}
+Course Rating: {review_request.courseReview or 'Not rated'}/5
+Professor Rating: {review_request.professorReview or 'Not rated'}/5
+Hours Spent per Week: {review_request.inputHours or 'Not specified'}
+
+Course Difficulty Assessment:
+{review_request.difficulty or 'No difficulty assessment provided'}
+
+Additional Student Comments:
+{review_request.additional_comment or 'No additional comments provided'}
+
+This is a student review containing valuable insights about course workload, difficulty level, and overall experience that can help other students understand what to expect from this course."""
+        
+        # Process through Pinecone for embeddings
+        try:
+            # Create document for Pinecone processing
+            review_document = {
+                "text": review_text_content,
+                "filename": f"Course_Review_{review_request.takenSemester}_{review_request.takenYear}.json",
+                "notebook_id": notebook_id,
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "processed_at": now
+            }
+            
+            # Add to Pinecone index
+            from .pinecone_service import pinecone_service
+            success = await pinecone_service.add_documents_to_notebook(
+                notebook_id=notebook_id,
+                documents=[review_document],
+                metadata={"filename": f"Course_Review_{review_request.takenSemester}_{review_request.takenYear}.json"}
+            )
+            
+            if not success:
+                logger.warning(f"Failed to add review to Pinecone index for notebook {notebook_id}")
+            else:
+                logger.info(f"Successfully added general review to Pinecone for notebook {notebook_id}")
+                
+        except Exception as e:
+            logger.error(f"Error processing review for Pinecone: {e}")
+            # Don't fail the entire request if Pinecone processing fails
+            import traceback
+            traceback.print_exc()
+        
+        return SourceResponse(
+            id=document_id,
+            title=f"Course Review - {review_request.takenSemester} {review_request.takenYear}",
+            full_text=f"Course Review: {review_request.grade} grade, {review_request.courseReview}/5 course rating, {review_request.professorReview}/5 professor rating",
+            created=now,
+            updated=now
+        )
+        
+    except Exception as e:
+        sanitized_error = sanitize_error_message(e)
+        raise HTTPException(status_code=500, detail=sanitized_error)
 
 
 @app.post("/notebooks/{notebook_id}/chat/", response_model=ChatMessageResponse)
