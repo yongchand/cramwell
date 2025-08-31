@@ -426,7 +426,7 @@ export default function NotebookPage() {
   }
 
   const handleFileUpload = async (files: FileList | File[], kind: string, metadata?: any) => {
-    // For general_review, handle via backend API
+    // For general_review, handle like other document types using Supabase
     if (kind === 'general_review') {
       if (!metadata) {
         toast({
@@ -439,31 +439,88 @@ export default function NotebookPage() {
 
       try {
         setIsUploading(true);
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        if (!userId) throw new Error("User not authenticated");
 
-        // Send review data to backend API
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/general-review/`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            takenYear: metadata.takenYear,
-            takenSemester: metadata.takenSemester,
-            grade: metadata.grade,
-            courseReview: metadata.courseReview,
-            professorReview: metadata.professorReview,
-            inputHours: metadata.inputHours,
-            difficulty: metadata.difficulty,
-            additional_comment: metadata.additional_comment
-          })
-        });
+        // Create document record directly in Supabase (like other uploads)
+        const documentDataToInsert: any = {
+          notebook_id: notebookId,
+          document_type: kind,
+          document_name: `Review_${new Date().toISOString().split('T')[0]}`,
+          document_path: "general_review_metadata",
+          file_size: 0,
+          document_info: {
+            mime_type: "application/json",
+            upload_timestamp: new Date().toISOString(),
+            review_data: {
+              taken_year: metadata.takenYear,
+              taken_semester: metadata.takenSemester,
+              grade: metadata.grade,
+              course_review: metadata.courseReview,
+              professor_review: metadata.professorReview,
+              input_hours: metadata.inputHours,
+              difficulty: metadata.difficulty,
+              additional_comment: metadata.additional_comment,
+              created_at: new Date().toISOString()
+            }
+          }
+        };
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to save review: ${errorText}`);
+        const { data: documentData, error: documentError } = await supabase
+          .from('documents')
+          .insert(documentDataToInsert)
+          .select()
+          .single();
+
+        if (documentError) {
+          throw new Error(`Failed to store review: ${documentError.message}`);
         }
 
-        const result = await response.json();
+        // Process through backend for Pinecone embeddings
+        try {
+          // Create searchable text content
+          const reviewText = `Course Review Information:
+
+Year Taken: ${metadata.takenYear || 'Not specified'}
+Semester: ${metadata.takenSemester || 'Not specified'}
+Grade Received: ${metadata.grade || 'Not specified'}
+Course Rating: ${metadata.courseReview || 'Not rated'}/5
+Professor Rating: ${metadata.professorReview || 'Not rated'}/5
+Hours Spent: ${metadata.inputHours || 'Not specified'}
+
+Course Difficulty Assessment:
+${metadata.difficulty || 'No difficulty assessment provided'}
+
+Additional Student Comments:
+${metadata.additional_comment || 'No additional comments provided'}
+
+This is a student review containing valuable insights about course workload, difficulty level, and overall experience that can help other students understand what to expect from this course.`;
+
+          // Create a temporary text file for processing
+          const reviewBlob = new Blob([reviewText], { type: 'text/plain' });
+          const reviewFile = new File([reviewBlob], `Course_Review_${metadata.takenSemester}_${metadata.takenYear}.txt`, { 
+            type: 'text/plain' 
+          });
+
+          // Send to backend for Pinecone processing
+          const formData = new FormData();
+          formData.append('file', reviewFile);
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/upload/?document_type=general_review`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            console.warn('Failed to process review for search, but review was saved successfully');
+          } else {
+            console.log('Review successfully processed for search indexing');
+          }
+        } catch (error) {
+          console.warn('Failed to process review for search, but review was saved successfully:', error);
+        }
 
         toast({
           title: "Review Saved",
