@@ -448,7 +448,7 @@ export default function NotebookPage() {
         const documentDataToInsert: any = {
           notebook_id: notebookId,
           document_type: kind,
-          document_name: `Review_${new Date().toISOString().split('T')[0]}`,
+          document_name: `Review_${new Date().toISOString().split('T')[0]}_${userId}`,
           document_path: "general_review_metadata",
           file_size: 0,
           document_info: {
@@ -476,6 +476,10 @@ export default function NotebookPage() {
 
         if (documentError) {
           throw new Error(`Failed to store review: ${documentError.message}`);
+        }
+
+        if (!documentData) {
+          throw new Error('No document data returned from database');
         }
 
         // Process through backend for Pinecone embeddings
@@ -512,15 +516,6 @@ This is a student review containing valuable insights about course workload, dif
             method: 'POST',
             body: formData,
           });
-
-          if (!response.ok) {
-            console.warn('Failed to process review for search, but review was saved successfully');
-          } else {
-            console.log('Review successfully processed for search indexing');
-          }
-        } catch (error) {
-          console.warn('Failed to process review for search, but review was saved successfully:', error);
-        }
 
         toast({
           title: "Review Saved",
@@ -1310,7 +1305,7 @@ This is a student review containing valuable insights about course workload, dif
       <UploadDialog 
         open={uploadDialogOpen} 
         onClose={closeUploadDialog} 
-        onUpload={(files, kind) => handleFileUpload(files, kind)}
+        onUpload={(files, kind, metadata) => handleFileUpload(files, kind, metadata)}
         isUploading={isUploading}
       />
 
