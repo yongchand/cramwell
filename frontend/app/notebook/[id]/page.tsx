@@ -517,6 +517,10 @@ This is a student review containing valuable insights about course workload, dif
             body: formData,
           });
 
+        } catch (error) {
+          // Pinecone processing failed but review was saved successfully
+        }
+
         toast({
           title: "Review Saved",
           description: "Your course review has been saved successfully",
