@@ -92,7 +92,7 @@ export default function NotebookPage() {
   const [newMessage, setNewMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'exam' | 'flashcards' | 'documents' | 'summary'>('summary')
+  const [activeTab, setActiveTab] = useState<'exam' | 'flashcards' | 'documents' | 'summary' | 'review'>('summary')
   const [studyFeatures, setStudyFeatures] = useState<{
     exam?: StudyFeature
     flashcards?: StudyFeature
@@ -122,6 +122,8 @@ export default function NotebookPage() {
 
   const [isHoveringLeft, setIsHoveringLeft] = useState(false)
   const [showFloatingButtons, setShowFloatingButtons] = useState(false)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
 
   useEffect(() => {
     setPageLoading(true)
@@ -129,7 +131,8 @@ export default function NotebookPage() {
       loadNotebook(),
       loadSources(),
       loadChatHistory(),
-      loadSummary()
+      loadSummary(),
+      loadReviews()
     ]).finally(() => {
       setPageLoading(false)
     })
@@ -269,6 +272,50 @@ export default function NotebookPage() {
       }
     } catch (error) {
       console.error('Error loading summary:', error)
+    }
+  }
+
+  const loadReviews = async () => {
+    try {
+      setReviewsLoading(true)
+      const supabase = createClient()
+      
+      // Get top 5 general_review documents ordered by created_at (most recent first)
+      const { data: reviewDocs, error } = await supabase
+        .from('documents')
+        .select('id, document_name, document_info, created_at')
+        .eq('notebook_id', notebookId)
+        .eq('document_type', 'general_review')
+        .eq('status', true)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (error) throw error
+
+      // Extract review data from document_info
+      const reviewsData = reviewDocs?.map(doc => ({
+        id: doc.id,
+        document_name: doc.document_name,
+        created_at: doc.created_at,
+        difficulty: doc.document_info?.review_data?.difficulty || 'No difficulty comment provided',
+        additional_comment: doc.document_info?.review_data?.additional_comment || 'No additional comment provided',
+        grade: doc.document_info?.review_data?.grade,
+        course_review: doc.document_info?.review_data?.course_review,
+        professor_review: doc.document_info?.review_data?.professor_review,
+        taken_year: doc.document_info?.review_data?.taken_year,
+        taken_semester: doc.document_info?.review_data?.taken_semester
+      })) || []
+
+      setReviews(reviewsData)
+    } catch (error) {
+      console.error('Error loading reviews:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load reviews",
+        variant: "destructive",
+      })
+    } finally {
+      setReviewsLoading(false)
     }
   }
 
@@ -521,6 +568,7 @@ This is a student review containing valuable insights about course workload, dif
 
         // Reload sources to show the new review
         await loadSources();
+        await loadReviews();
         setUploadDialogOpen(false);
 
       } catch (error) {
@@ -1634,7 +1682,7 @@ This is a student review containing valuable insights about course workload, dif
         <section className="flex flex-col h-full min-h-0 bg-muted/50 p-6 border-l border-muted">
             {/* Tabs and study tools content (Sample Exam, Flash Cards, Summary) */}
         <div className="mb-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
             <Button
               variant={activeTab === 'summary' ? 'default' : 'outline'}
               size="sm"
@@ -1666,6 +1714,14 @@ This is a student review containing valuable insights about course workload, dif
               className={`text-sm py-3 ${activeTab === 'documents' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
               <BookOpen className="h-4 w-4 mr-1" /> Docs
+            </Button>
+            <Button
+              variant={activeTab === 'review' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('review')}
+              className={`text-sm py-3 ${activeTab === 'review' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
+            >
+              <MessageSquare className="h-4 w-4 mr-1" /> Review
             </Button>
           </div>
         </div>
@@ -2085,6 +2141,114 @@ This is a student review containing valuable insights about course workload, dif
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'review' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold">Course Reviews</h3>
+                <Button
+                  onClick={() => loadReviews()}
+                  variant="outline"
+                  size="sm"
+                  disabled={reviewsLoading}
+                  className="border-uchicago-crimson text-uchicago-crimson hover:bg-uchicago-crimson hover:text-white"
+                >
+                  {reviewsLoading ? (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {reviewsLoading ? (
+                <div className="text-center py-8">
+                  <RotateCcw className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+                  <p className="text-muted-foreground">Loading reviews...</p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    No course reviews available yet.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Upload a general review to see student feedback here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((review, index) => (
+                    <div key={review.id} className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 space-y-2 md:space-y-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                          <h4 className="font-semibold text-lg">Review #{index + 1}</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {review.grade && (
+                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-md text-sm font-medium">
+                                Grade: {review.grade}
+                              </span>
+                            )}
+                            {review.taken_semester && review.taken_year && (
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-sm">
+                                {review.taken_semester} {review.taken_year}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-1 sm:space-y-0">
+                          {review.course_review && (
+                            <div className="text-sm text-gray-600">
+                              Course: {review.course_review}/5
+                            </div>
+                          )}
+                          {review.professor_review && (
+                            <div className="text-sm text-gray-600">
+                              Prof: {review.professor_review}/5
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <h5 className="font-medium text-gray-700 mb-2">Difficulty Assessment:</h5>
+                          <p className="text-gray-600 bg-gray-50 p-3 md:p-4 rounded-md text-sm leading-relaxed">
+                            {review.difficulty}
+                          </p>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-gray-700 mb-2">Additional Comments:</h5>
+                          <p className="text-gray-600 bg-gray-50 p-3 md:p-4 rounded-md text-sm leading-relaxed">
+                            {review.additional_comment}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500">
+                          Submitted on {new Date(review.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

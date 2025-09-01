@@ -86,10 +86,13 @@ export function UploadDialog({ open, onClose, onUpload, isUploading = false }: U
         const metadata = kind === 'general_review' ? reviewMetadata : undefined;
         // For general_review, pass empty array since no files are allowed
         const filesToUpload = kind === 'general_review' ? [] : selectedFiles;
+        
         await onUpload(filesToUpload, kind, metadata);
+        
         // Clear files after upload is complete
         setSelectedFiles([]);
         setUploadSuccess(true);
+        
         // Don't call onClose() here - let the parent handle it
       } catch (error) {
         // Error handling is done in the parent component
