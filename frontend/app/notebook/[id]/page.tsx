@@ -275,6 +275,60 @@ export default function NotebookPage() {
     }
   }
 
+  const loadExam = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/exam`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data) {
+          setStudyFeatures(prev => ({
+            ...prev,
+            exam: data
+          }))
+          
+          // Parse exam questions
+          const parsedQuestions = parseExamQuestions(data.content)
+          setExamQuestions(parsedQuestions)
+          setSelectedAnswers({})
+          setShowAnswers(false)
+        }
+      } else if (response.status === 404) {
+        // No exam exists yet, generate it
+        await generateStudyFeature('exam')
+      }
+    } catch (error) {
+      console.error('Error loading exam:', error)
+      // If loading fails, try to generate
+      await generateStudyFeature('exam')
+    }
+  }
+
+  const loadFlashcards = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/notebooks/${notebookId}/flashcards`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data) {
+          setStudyFeatures(prev => ({
+            ...prev,
+            flashcards: data
+          }))
+          
+          // Reset flashcard state
+          setCurrentFlashcardIndex(0)
+          setIsFlipped(false)
+        }
+      } else if (response.status === 404) {
+        // No flashcards exist yet, generate them
+        await generateStudyFeature('flashcards')
+      }
+    } catch (error) {
+      console.error('Error loading flashcards:', error)
+      // If loading fails, try to generate
+      await generateStudyFeature('flashcards')
+    }
+  }
+
   const loadReviews = async () => {
     try {
       setReviewsLoading(true)
@@ -1162,6 +1216,117 @@ This is a student review containing valuable insights about course workload, dif
     }
   }
 
+  const downloadFlashcardsAsPDF = async () => {
+    if (!studyFeatures.flashcards?.content) {
+      toast({
+        title: "No Flashcards",
+        description: "Please generate flashcards before downloading",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const flashcards = parseFlashcards(studyFeatures.flashcards.content)
+      
+      if (flashcards.length === 0) {
+        toast({
+          title: "No Flashcards",
+          description: "No flashcards found to download",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Create a PDF document
+      const pdf = new jsPDF()
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 20
+      let yPosition = margin
+
+      // Add title
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      const title = `${notebook?.name} - Flashcards`
+      pdf.text(title, margin, yPosition)
+      yPosition += 20
+
+      // Add date
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      const date = `Generated on: ${new Date().toLocaleDateString()}`
+      pdf.text(date, margin, yPosition)
+      yPosition += 15
+
+      // Add instructions
+      pdf.setFontSize(10)
+      pdf.text('Instructions: Use these flashcards for studying key concepts and definitions.', margin, yPosition)
+      yPosition += 20
+
+      // Add flashcards
+      pdf.setFontSize(12)
+      flashcards.forEach((flashcard, index) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 80) {
+          pdf.addPage()
+          yPosition = margin
+        }
+
+        // Card number
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(14)
+        const cardNumber = `Card ${index + 1}`
+        pdf.text(cardNumber, margin, yPosition)
+        yPosition += 15
+
+        // Front of the card
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(12)
+        pdf.text('Front:', margin, yPosition)
+        yPosition += 5
+        
+        pdf.setFont('helvetica', 'normal')
+        const frontLines = pdf.splitTextToSize(flashcard.front, pageWidth - margin * 2 - 10)
+        pdf.text(frontLines, margin + 10, yPosition)
+        yPosition += frontLines.length * 5 + 8
+
+        // Back of the card
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Back:', margin, yPosition)
+        yPosition += 5
+        
+        pdf.setFont('helvetica', 'normal')
+        const backLines = pdf.splitTextToSize(flashcard.back, pageWidth - margin * 2 - 10)
+        pdf.text(backLines, margin + 10, yPosition)
+        yPosition += backLines.length * 5 + 15
+
+        // Add a separator line
+        if (index < flashcards.length - 1) {
+          pdf.setDrawColor(200, 200, 200)
+          pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+          yPosition += 10
+        }
+      })
+
+      // Save the PDF
+      const fileName = `${notebook?.name || 'Course'}_Flashcards.pdf`
+      pdf.save(fileName)
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Flashcards have been successfully downloaded as PDF",
+      })
+    } catch (error) {
+      console.error('Failed to download flashcards PDF:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleShare = () => {
     setShareDialogOpen(true);
   };
@@ -1255,6 +1420,17 @@ This is a student review containing valuable insights about course workload, dif
     loadPastSessions()
   }
 
+  const handleTabChange = async (tabName: 'exam' | 'flashcards' | 'documents' | 'summary' | 'review') => {
+    setActiveTab(tabName)
+    
+    // Auto-load/generate content when switching to exam or flashcards
+    if (tabName === 'exam' && !studyFeatures.exam) {
+      await loadExam()
+    } else if (tabName === 'flashcards' && !studyFeatures.flashcards) {
+      await loadFlashcards()
+    }
+  }
+
   if (pageLoading || !notebook) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-uchicago-crimson to-uchicago-maroon flex items-center justify-center">
@@ -1321,14 +1497,16 @@ This is a student review containing valuable insights about course workload, dif
           <span className="text-white/80 text-sm hidden lg:inline truncate">{notebook.description}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Temporarily commented out share button
           <Button variant="default" onClick={handleShare} className="flex items-center gap-2 bg-white text-uchicago-crimson border border-uchicago-crimson hover:bg-uchicago-maroon hover:text-white px-3 md:px-4">
             <Share2 className="h-4 w-4" /> 
             <span className="hidden sm:inline">Share</span>
           </Button>
+          */}
         </div>
       </header>
 
-      {/* Share Dialog */}
+      {/* Temporarily commented out share dialog
       <Dialog open={shareDialogOpen} onOpenChange={closeShareDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1345,6 +1523,7 @@ This is a student review containing valuable insights about course workload, dif
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      */}
 
       {/* Upload Dialog (drag & drop) */}
       <UploadDialog 
@@ -1505,6 +1684,7 @@ This is a student review containing valuable insights about course workload, dif
                 <History className="h-4 w-4 mr-2" />
                 History
               </Button>
+              {/* Temporarily commented out share button
               <Button
                 variant="outline"
                 size="sm"
@@ -1513,6 +1693,7 @@ This is a student review containing valuable insights about course workload, dif
                 <Share className="h-4 w-4 mr-2" />
                 Share
               </Button>
+              */}
             </div>
           </div>
 
@@ -1682,11 +1863,11 @@ This is a student review containing valuable insights about course workload, dif
         <section className="flex flex-col h-full min-h-0 bg-muted/50 p-6 border-l border-muted">
             {/* Tabs and study tools content (Sample Exam, Flash Cards, Summary) */}
         <div className="mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
             <Button
               variant={activeTab === 'summary' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTab('summary')}
+              onClick={() => handleTabChange('summary')}
               className={`text-sm py-3 ${activeTab === 'summary' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
               <FileText className="h-4 w-4 mr-1" /> Summary
@@ -1694,7 +1875,7 @@ This is a student review containing valuable insights about course workload, dif
             <Button
               variant={activeTab === 'exam' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTab('exam')}
+              onClick={() => handleTabChange('exam')}
               className={`text-sm py-3 ${activeTab === 'exam' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
               <HelpCircle className="h-4 w-4 mr-1" /> Exam
@@ -1702,11 +1883,12 @@ This is a student review containing valuable insights about course workload, dif
             <Button
               variant={activeTab === 'flashcards' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTab('flashcards')}
+              onClick={() => handleTabChange('flashcards')}
               className={`text-sm py-3 ${activeTab === 'flashcards' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
               <FileTextIcon className="h-4 w-4 mr-1" /> Cards
             </Button>
+            {/* Temporarily commented out docs tab
             <Button
               variant={activeTab === 'documents' ? 'default' : 'outline'}
               size="sm"
@@ -1715,10 +1897,11 @@ This is a student review containing valuable insights about course workload, dif
             >
               <BookOpen className="h-4 w-4 mr-1" /> Docs
             </Button>
+            */}
             <Button
               variant={activeTab === 'review' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTab('review')}
+              onClick={() => handleTabChange('review')}
               className={`text-sm py-3 ${activeTab === 'review' ? 'bg-uchicago-crimson text-white font-bold' : 'text-uchicago-crimson border-uchicago-crimson'} hover:bg-uchicago-maroon`}
             >
               <MessageSquare className="h-4 w-4 mr-1" /> Review
@@ -1768,6 +1951,7 @@ This is a student review containing valuable insights about course workload, dif
                         <Download className="h-4 w-4" />
                         Download PDF
                       </Button>
+                      {/* Temporarily commented out regenerate button
                       <Button
                         variant="outline"
                         size="sm"
@@ -1776,6 +1960,7 @@ This is a student review containing valuable insights about course workload, dif
                       >
                         Regenerate
                       </Button>
+                      */}
                     </div>
                   </div>
                   {examQuestions.length > 0 ? (
@@ -1907,14 +2092,28 @@ This is a student review containing valuable insights about course workload, dif
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Flashcards</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => generateStudyFeature('flashcards')}
-                      disabled={isGenerating}
-                    >
-                      Regenerate
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={downloadFlashcardsAsPDF}
+                        disabled={!studyFeatures.flashcards?.content}
+                        className="flex items-center gap-2 bg-uchicago-crimson hover:bg-uchicago-maroon"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download PDF
+                      </Button>
+                      {/* Temporarily commented out regenerate button
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateStudyFeature('flashcards')}
+                        disabled={isGenerating}
+                      >
+                        Regenerate
+                      </Button>
+                      */}
+                    </div>
                   </div>
                   
                   {/* Interactive Flashcards */}
@@ -2046,6 +2245,7 @@ This is a student review containing valuable insights about course workload, dif
             </div>
           )}
 
+          {/* Temporarily commented out documents tab content
           {activeTab === 'documents' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -2094,11 +2294,13 @@ This is a student review containing valuable insights about course workload, dif
               )}
             </div>
           )}
+          */}
 
           {activeTab === 'summary' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Course Summary</h3>
+                {/* Temporarily commented out regenerate button
                 <Button
                   variant="outline"
                   size="sm"
@@ -2117,6 +2319,7 @@ This is a student review containing valuable insights about course workload, dif
                     </>
                   )}
                 </Button>
+                */}
               </div>
               
               {/* Course Statistics Charts */}

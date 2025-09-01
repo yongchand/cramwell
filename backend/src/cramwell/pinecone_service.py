@@ -84,6 +84,7 @@ class PineconeService:
                         'notebook_id': notebook_id,
                         'text': doc['text'],
                         'filename': doc.get('filename', 'unknown'),
+                        'document_type': doc.get('document_type', 'course_files'),
                         'processed_at': datetime.now().isoformat()
                     }
                 }

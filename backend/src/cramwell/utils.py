@@ -696,6 +696,7 @@ async def process_file_for_notebook(
                 "text": chunk,
                 "filename": os.path.basename(file_path),
                 "notebook_id": notebook_id,
+                "document_type": document_type,
                 "chunk_index": i,
                 "total_chunks": len(text_chunks),
                 "processed_at": datetime.now().isoformat()
@@ -706,7 +707,7 @@ async def process_file_for_notebook(
         success = await pinecone_service.add_documents_to_notebook(
             notebook_id=notebook_id,
             documents=documents,
-            metadata={"filename": os.path.basename(file_path)}
+            metadata={"filename": os.path.basename(file_path), "document_type": document_type}
         )
         
         # Store chunk count before cleanup
